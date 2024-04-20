@@ -208,6 +208,9 @@ pub enum Linter {
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
+    /// [Information Flow](TODO: add link)
+    #[prefix = "IF"]
+    InformationFlow,
 }
 
 pub trait RuleNamespace: Sized {
