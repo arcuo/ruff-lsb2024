@@ -1,13 +1,12 @@
 
-# ifauthorities = {
+# ifprinciples {
 #     alice,
 #     bob,
 # }
 
-# iflabel {alice, [bob]}
-a = 69
-# iflabel {bob, []}
-b = 42
+
+a = 69 # iflabel {alice, [bob]}
+b = 42 # iflabel {bob, []}
 
 # IF001: Fail - Information flow from a to b
 a = b

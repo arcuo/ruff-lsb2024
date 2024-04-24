@@ -5,3 +5,4 @@ pub(crate) mod logical_lines;
 pub(crate) mod noqa;
 pub(crate) mod physical_lines;
 pub(crate) mod tokens;
+pub(crate) mod information_flow;

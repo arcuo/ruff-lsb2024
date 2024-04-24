@@ -68,6 +68,8 @@ use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
+use super::information_flow::InformationFlowState;
+
 mod analyze;
 mod annotation;
 mod deferred;
@@ -149,6 +151,8 @@ pub(crate) struct Checker<'a> {
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
+    /// The [`InformationFlowState`], built up over the course of the AST traversal
+    information_flow: InformationFlowState<'a>,
 }
 
 impl<'a> Checker<'a> {
@@ -189,6 +193,7 @@ impl<'a> Checker<'a> {
             notebook_index,
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
+            information_flow: InformationFlowState::new(&indexer, &locator),
         }
     }
 }
