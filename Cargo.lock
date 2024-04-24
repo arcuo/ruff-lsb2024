@@ -2014,6 +2014,7 @@ dependencies = [
  "is-macro",
  "is-wsl",
  "itertools 0.12.1",
+ "lazy_static",
  "libcst",
  "log",
  "memchr",

@@ -152,7 +152,7 @@ pub(crate) struct Checker<'a> {
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
     /// The [`InformationFlowState`], built up over the course of the AST traversal
-    information_flow: InformationFlowState<'a>,
+    information_flow: InformationFlowState,
 }
 
 impl<'a> Checker<'a> {

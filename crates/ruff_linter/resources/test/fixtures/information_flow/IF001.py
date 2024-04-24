@@ -1,8 +1,5 @@
 
-# ifprinciples {
-#     alice,
-#     bob,
-# }
+# ifprinciples { alice, bob }
 
 
 a = 69 # iflabel {alice, [bob]}

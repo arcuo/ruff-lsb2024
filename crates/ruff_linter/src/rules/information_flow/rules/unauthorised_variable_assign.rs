@@ -76,7 +76,7 @@ enum LabelOwnership {
 }
 
 struct VariableLabel {
-    owner: Some(String),
+    owner: Option<String>,
     ownership: LabelOwnership,
     
 }
