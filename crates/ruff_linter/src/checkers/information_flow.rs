@@ -11,7 +11,7 @@ use rustc_hash::FxHashMap;
 #[derive()]
 pub(crate) struct InformationFlowState {
     // The current principles of the program, e.g. ['alice', 'bob']
-    principals: Vec<String>,
+    principals: Principals,
     // The current scope level queue. The level is updated according to the scope by popping and
     pc: VecDeque<String>,
     // Map from variable name to
@@ -39,6 +39,26 @@ impl InformationFlowState {
 #[derive(Debug, PartialEq)]
 struct Principals {
     principals: Vec<String>,
+}
+
+impl Principals {
+    fn new(principals: Vec<String>) -> Self {
+        Self { principals }
+    }
+
+    fn new_from_str(principals: Vec<&str>) -> Self {
+        Self {
+            principals: principals.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    fn new_empty() -> Self {
+        Self { principals: vec![] }
+    }
+
+    fn concat(&mut self, other: &Principals) {
+        self.principals.extend(other.principals.clone());
+    }
 }
 
 lazy_static! {
@@ -89,32 +109,96 @@ fn test_parse_principals() {
 }
 
 /// Initiate the principals list
-fn initiate_principals(indexer: &Indexer, locator: &Locator) -> Vec<String> {
-    let principals: Vec<String> = vec![];
+fn initiate_principals(indexer: &Indexer, locator: &Locator) -> Principals {
+    let mut principals = Principals::new_empty();
     // TODO: Implement logic to extract principals from block comments with comment_ranges.block_comments()
     for range in indexer.comment_ranges() {
         let comment = locator.slice(range).replace("#", "");
-        if let Ok(principals) = comment.parse::<Principals>() {
-            return principals.principals;
+        if let Ok(_principals) = comment.parse::<Principals>() {
+            principals.concat(&_principals);
         }
     }
 
     return principals;
 }
 
-#[test]
-fn test_initiate_principals() {
-    use ruff_python_parser::tokenize;
-    use ruff_python_parser::Mode;
+#[cfg(test)]
+mod initiate_principals_tests {
+    use super::*;
 
-    let source: &str = r#"
+    #[test]
+    fn test_initiate_principals_with_principals() {
+        use ruff_python_parser::tokenize;
+        use ruff_python_parser::Mode;
+
+        let source: &str = r#"
 # ifprincipals { alice, bob }
 
 # This is a comment
+x = 1
 "#;
-    let tokens = tokenize(source, Mode::Module);
-    let locator = Locator::new(source);
-    let indexer = Indexer::from_tokens(&tokens, &locator);
-    let principals = initiate_principals(&indexer, &locator);
-    assert_eq!(principals, vec!["alice", "bob"]);
+        let tokens = tokenize(source, Mode::Module);
+        let locator = Locator::new(source);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let principals = initiate_principals(&indexer, &locator);
+        assert_eq!(principals, Principals::new_from_str(vec!["alice", "bob"]));
+    }
+
+
+    #[test]
+    fn test_initiate_principals_with_principals_not_first_comment() {
+        use ruff_python_parser::tokenize;
+        use ruff_python_parser::Mode;
+
+        let source: &str = r#"
+# This is a comment
+# ifprincipals { alice, bob }
+
+x = 1
+"#;
+        let tokens = tokenize(source, Mode::Module);
+        let locator = Locator::new(source);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let principals = initiate_principals(&indexer, &locator);
+        assert_eq!(principals, Principals::new_from_str(vec!["alice", "bob"]));
+    }
+
+
+    #[test]
+    fn test_initiate_principals_no_principals() {
+        use ruff_python_parser::tokenize;
+        use ruff_python_parser::Mode;
+
+        let source: &str = r#"
+# This is a comment
+x = 1
+"#;
+        let tokens = tokenize(source, Mode::Module);
+        let locator = Locator::new(source);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let principals = initiate_principals(&indexer, &locator);
+        let empty: Vec<String> = vec![];
+        assert_eq!(principals, Principals::new(empty));
+    }
+
+    #[test]
+    fn test_initiate_principals_multiple_principals_concat() {
+        use ruff_python_parser::tokenize;
+        use ruff_python_parser::Mode;
+
+        let source: &str = r#"
+# ifprincipals { alice, bob }
+# ifprincipals { charlie, dean }
+# This is a comment
+x = 1
+"#;
+        let tokens = tokenize(source, Mode::Module);
+        let locator = Locator::new(source);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let principals = initiate_principals(&indexer, &locator);
+        assert_eq!(
+            principals,
+            Principals::new_from_str(vec!["alice", "bob", "charlie", "dean"])
+        );
+    }
 }
