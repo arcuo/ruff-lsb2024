@@ -32,6 +32,10 @@ pub(crate) struct Label {
 }
 
 impl Label {
+    pub(crate) fn new(principals: Vec<String>) -> Self {
+        Self { principals }
+    }
+
     pub(crate) fn is_public(&self) -> bool {
         self.principals.is_empty()
     }
@@ -121,32 +125,34 @@ impl InformationFlowState {
             }
         }
     }
+}
 
-    /// Check lattice for unauthorised label
-    pub(crate) fn is_unauthorised(&self, label: Label) -> bool {
-        todo!()
+/// Check labels direction convertion i.e. you can move down in the lattice, not up
+pub(crate) fn can_convert_label(from_label: &Label, to_label: &Label) -> bool {
+    // If the test label is public, then it is never more restrictive
+    if to_label.is_public() {
+        return true;
     }
+
+    // If the to_label has more principals, then it is more restrictive
+    if from_label.principals.len() > to_label.principals.len() {
+        // Check if the to_label is a subset of the from_label
+        for principal in &to_label.principals {
+            if !from_label.principals.contains(principal) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // If the conv_label has the same principals, then it is not more restrictive
+    return to_label.principals.len() == from_label.principals.len()
+        && to_label.principals != from_label.principals;
 }
 
 #[derive(Debug, PartialEq)]
 struct Principals {
     principals: Vec<String>,
-}
-
-struct Lattice {
-    labels: Vec<Label>,
-}
-
-impl Lattice {
-    fn new() -> Self {
-        Self { labels: vec![] }
-    }
-
-    // TODO: implement lattice recursive function
-    fn from_principals(&mut self, principals: Principals) -> Self {
-        let labels: Vec<Label> = vec![Label::new_public()];
-        todo!()
-    }
 }
 
 impl Principals {
