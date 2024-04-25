@@ -1433,11 +1433,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
             if checker.enabled(Rule::UnauthorisedVariableAssign) {
-                information_flow::rules::unauthorised_variable_assign(checker, assign);
+                information_flow::rules::unauthorised_variable_assign::unauthorised_variable_assign(checker, assign);
             }
             if checker.enabled(Rule::SelfOrClsAssignment) {
                 for target in targets {
                     pylint::rules::self_or_cls_assignment(checker, target);
+                }
                 }
             }
             if checker.enabled(Rule::RedeclaredAssignedName) {

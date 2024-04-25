@@ -281,6 +281,11 @@ impl<'a> Checker<'a> {
         &self.semantic
     }
 
+    /// The [`InformationFlowState`], built up over the course of the AST traversal
+    pub(crate) const fn information_flow(&self) -> &InformationFlowState {
+        &self.information_flow
+    }
+
     /// The [`Path`] to the file under analysis.
     pub(crate) const fn path(&self) -> &'a Path {
         self.path
@@ -1759,6 +1764,17 @@ impl<'a> Checker<'a> {
 
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);
+
+        // Add information flow label variable binding
+        // TODO: Add check for is information flow is enabled
+        // TODO: Inherit binding from value
+        // TODO: Are there times when we can skip this?
+        self.information_flow.add_variable_label_binding(
+            binding_id,
+            range,
+            self.locator(),
+            self.indexer().comment_ranges(),
+        );
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {

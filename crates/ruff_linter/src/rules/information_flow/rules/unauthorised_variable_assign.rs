@@ -1,9 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::StmtAssign;
+use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+
+use super::helpers::get_variable_label;
 
 /// ## What it does
 /// Assert assignment to labels
@@ -40,46 +42,55 @@ impl Violation for UnauthorisedVariableAssign {
 
 // TODO
 /// IF001
-pub(crate) fn unauthorised_variable_assign(checker: &mut Checker, assign: &StmtAssign) {
-    // Use checker.indexer.comment_ranges ??
-    if checker.semantic().in_async_context() {
-        // if checker
-        //     .semantic()
-        if true {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(UnauthorisedVariableAssign, assign.range()));
-        }
+pub(crate) fn unauthorised_variable_assign(checker: &mut Checker, assign: &Stmt) {
+    if is_unauthorised_assign_statement(checker, assign) {
+        // Add diagnostics
+        checker
+            .diagnostics
+            .push(Diagnostic::new(UnauthorisedVariableAssign, assign.range()));
     }
 }
 
-/// A label can indicate that the variable is either public or owned
-/// 
-/// Below are public
-/// ```python
-/// # iflabel public
-/// a = 1
-/// a = 2 # iflabel public
-/// 
-/// a = 3
-/// ```
-/// 
-/// Below are owned
-/// ```python
-/// # iflabel {alice, []}
-/// a = 1
-/// a = 2 # iflabel {bob, []}
-/// ```
-enum LabelOwnership {
-    Public,
-    Owned,
-}
+fn is_unauthorised_assign_statement(checker: &mut Checker, stmt: &Stmt) -> bool {
+    // TODO: cleanup here
+    // Get variable and value names
+    if let Some((Some(variable_name), value_name)) = match stmt {
+        Stmt::Assign(assign) => {
+            if let variable_name = match assign.targets.first() {
+                // TODO: multiple assignment, for now only check first target
+                Some(Expr::Name(expr_name)) => Some(expr_name),
+                _ => None,
+            } {
+                if let value_name = match assign.value.as_ref() {
+                    Expr::Name(expr_name) => Some(expr_name), // Check for values in Tuples, Lists, Classes, etc.
+                    _ => None,
+                } {
+                    Some((variable_name, value_name))
+                } else {
+                    Some((variable_name, None))
+                }
+            } else {
+                None
+            }
+        }
+        _ => None,
+    } {
+        // Get labels
+        let variable_label = get_variable_label(checker, variable_name);
+        let value_label = if value_name.is_some() {
+            get_variable_label(checker, value_name.unwrap())
+        } else {
+            None
+        };
 
-struct VariableLabel {
-    owner: Option<String>,
-    ownership: LabelOwnership,
-    
-}
+        // No label for the value or it is public, then it is not unauthorised
+        if value_label.is_none() || value_label.unwrap().is_public() {
+            return false;
+        }
 
-/// Check comments above or inline for label, otherwise return public
-fn check_for_label(checker: &mut Checker, assign: &StmtAssign) {}
+        // Check information flow lattice
+
+    }
+
+    return false;
+}
