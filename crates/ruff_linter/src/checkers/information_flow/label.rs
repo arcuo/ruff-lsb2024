@@ -7,7 +7,7 @@ lazy_static! {
         Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
 }
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone, Default, Eq)]
 pub(crate) struct Label {
     pub(crate) principals: Vec<String>,
 }

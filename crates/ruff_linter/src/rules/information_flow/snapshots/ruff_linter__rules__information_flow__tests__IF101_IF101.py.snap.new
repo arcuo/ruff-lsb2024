@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 23
+---
+IF101.py:18:11: IF101 Unauthorised assignment of variable
+   |
+17 | # IF001: Fail - Information flow from {alice,bob} to {bob}
+18 | bob_var = alice_bob_var
+   |           ^^^^^^^^^^^^^ IF101
+19 | 
+20 | # IF001: Fail - public var are less restrictive than alice_var
+   |
+
+IF101.py:21:14: IF101 Unauthorised assignment of variable
+   |
+20 | # IF001: Fail - public var are less restrictive than alice_var
+21 | public_var = alice_bob_var
+   |              ^^^^^^^^^^^^^ IF101
+22 | 
+23 | # IF001: Fail - public var are less restrictive than bob_var
+   |
