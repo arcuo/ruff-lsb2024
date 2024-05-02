@@ -210,7 +210,7 @@ a = 1
             Err(_) => panic!("Failed to parse module"),
         }
 
-        assert!(state.variable_map.is_empty());
+        assert!(state.variable_map.len() != 0);
         assert!(state.variable_map.contains_key(&BindingId::from(0u32)));
         assert!(state.variable_map.get(&BindingId::from(0u32)).unwrap() == &Label::new_public());
     }
