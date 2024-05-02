@@ -1,6 +1,6 @@
-use std::str::FromStr;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::str::FromStr;
 
 lazy_static! {
     static ref LABEL_REGEX: Regex =
@@ -26,8 +26,18 @@ impl Label {
         Self { principals: vec![] }
     }
 }
+#[derive(Debug, Clone)]
+pub(crate) struct LabelParseError;
+
+impl std::fmt::Display for LabelParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Label parse error")
+    }
+}
 
 impl FromStr for Label {
+    type Err = LabelParseError;
+
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         match LABEL_REGEX.captures(string) {
             Some(captures) => match captures.name("label") {
@@ -42,11 +52,9 @@ impl FromStr for Label {
                 }
                 None => return Ok(Label::new_public()),
             },
-            None => Err(()),
+            None => Err(LabelParseError),
         }
     }
-
-    type Err = ();
 }
 
 /// Check labels direction convertion i.e. you can move down in the lattice, not up
@@ -70,4 +78,45 @@ pub(crate) fn can_convert_label(from_label: &Label, to_label: &Label) -> bool {
     // If the conv_label has the same principals, then it is not more restrictive
     return to_label.principals.len() == from_label.principals.len()
         && to_label.principals != from_label.principals;
+}
+
+#[cfg(test)]
+mod test_labels {
+    use super::Label;
+    #[test]
+    fn test_label_parse_one() {
+        let label = "iflabel { alice }".parse::<Label>().unwrap();
+        assert_eq!(label, Label::new(vec!["alice".to_string()]));
+    }
+
+    #[test]
+    fn test_label_parse_multiple() {
+        let principals = vec!["alice", "bob", "charlie"];
+
+        let mut label_string = String::from("iflabel {");
+
+        let mut i = 0;
+        while i < principals.len() {
+            let formatted_string = format!("{}, {}", label_string, principals[i]);
+            label_string = formatted_string;
+
+            let label = (format!("{}}}", label_string)).parse::<Label>().unwrap();
+            assert_eq!(label, Label::new(principals[..i+1].iter().map(|s| s.to_string()).collect()));
+            i += 1;
+        }
+    }
+
+    #[test]
+    fn test_label_parse_public() {
+        let label = "iflabel {}".parse::<Label>().unwrap();
+        assert_eq!(label, Label::new_public());
+
+        let label = "iflabel { }".parse::<Label>().unwrap();
+        assert_eq!(label, Label::new_public());
+    }
+
+    #[test]
+    fn test_failing_regex_should_throw() {
+        assert!("".parse::<Label>().is_err());
+    }
 }
