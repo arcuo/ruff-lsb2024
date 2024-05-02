@@ -71,22 +71,24 @@ impl InformationFlowState {
             }
             // No comment on same line, check previous line
             None => {
-                let previous_line_range =
-                    locator.line_range(TextSize::from(range.start().to_u32() - 1));
-                let label_comment = comment_ranges
-                    .comments_in_range(previous_line_range)
-                    .first();
-                match label_comment {
-                    Some(comment) => {
-                        let comment_text: &str = &locator.slice(comment).replace("#", "");
-                        if let Ok(label) = comment_text.parse::<Label>() {
-                            self.variable_map.insert(binding_id, label);
+                let start_range = range.start().to_u32();
+                if start_range != 0 {
+                    let previous_line_range = locator.line_range(TextSize::from(start_range - 1));
+                    let label_comment = comment_ranges
+                        .comments_in_range(previous_line_range)
+                        .first();
+                    match label_comment {
+                        Some(comment) => {
+                            let comment_text: &str = &locator.slice(comment).replace("#", "");
+                            if let Ok(label) = comment_text.parse::<Label>() {
+                                self.variable_map.insert(binding_id, label);
+                            }
                         }
-                    }
-                    None =>
-                    // No label comment, add public label
-                    {
-                        self.variable_map.insert(binding_id, Label::new_public());
+                        None =>
+                        // No label comment, add public label
+                        {
+                            self.variable_map.insert(binding_id, Label::new_public());
+                        }
                     }
                 }
             }
