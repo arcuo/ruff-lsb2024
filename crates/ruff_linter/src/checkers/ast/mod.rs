@@ -68,7 +68,7 @@ use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
-use super::information_flow::InformationFlowState;
+use super::information_flow::information_flow_state::InformationFlowState;
 
 mod analyze;
 mod annotation;
@@ -279,6 +279,11 @@ impl<'a> Checker<'a> {
     /// The [`SemanticModel`], built up over the course of the AST traversal.
     pub(crate) const fn semantic(&self) -> &SemanticModel<'a> {
         &self.semantic
+    }
+
+    /// The [`InformationFlowState`], built up over the course of the AST traversal
+    pub(crate) const fn information_flow(&self) -> &InformationFlowState {
+        &self.information_flow
     }
 
     /// The [`Path`] to the file under analysis.
@@ -1759,6 +1764,22 @@ impl<'a> Checker<'a> {
 
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);
+
+        // Add information flow label variable binding
+        // TODO: Add check for is information flow is enabled
+        // TODO: Inherit binding from value
+        // TODO: Are there times when we can skip this?
+        match self.semantic.current_scope().shadowed_binding(binding_id) {
+            Some(_) => {} // Don't add binding for already added bindings
+            None => {
+                self.information_flow.add_variable_label_binding(
+                    binding_id,
+                    range,
+                    self.locator(),
+                    self.indexer().comment_ranges(),
+                );
+            }
+        }
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {

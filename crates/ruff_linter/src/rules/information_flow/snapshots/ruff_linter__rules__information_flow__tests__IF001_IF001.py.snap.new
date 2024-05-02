@@ -2,4 +2,20 @@
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 assertion_line: 23
 ---
+IF001.py:15:1: IF001 Unauthorised assignment of variable
+   |
+14 | # IF001: Fail - Information flow from a to b
+15 | alice_var = bob_var
+   | ^^^^^^^^^^^^^^^^^^^ IF001
+16 | 
+17 | # IF001: Success Information flow from b to a
+   |
 
+IF001.py:18:1: IF001 Unauthorised assignment of variable
+   |
+17 | # IF001: Success Information flow from b to a
+18 | bob_var = alice_var
+   | ^^^^^^^^^^^^^^^^^^^ IF001
+19 | 
+20 | # IF001: Fail, public var are less restrictive than alice_var
+   |
