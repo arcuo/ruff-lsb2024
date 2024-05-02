@@ -1440,10 +1440,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
-            if checker.enabled(Rule::UnauthorisedVariableAssign) {
-                information_flow::rules::unauthorised_variable_assign(
+            if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+                information_flow::rules::inconfidential_assign_statement(
                     checker,
-                    assign.range(),
                     &assign.targets,
                     &assign.value,
                 );

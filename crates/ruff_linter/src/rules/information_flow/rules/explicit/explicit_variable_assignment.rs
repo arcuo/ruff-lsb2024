@@ -1,39 +1,38 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
-use ruff_text_size::TextRange;
 
-use crate::checkers::{ast::Checker, information_flow::label::can_convert_label};
+use crate::checkers::{
+    ast::Checker,
+    information_flow::label::{can_convert_label, Label},
+};
 
 use super::helpers::get_variable_label;
 
 /// ## What it does
-/// Assert assignment to labels
+/// Check confidentiality of information flow in variable assignments.
 ///
 /// ## Why is this bad?
+/// Public variables or variables with labels that are cannot flow in the information flow lattice
+/// to the value being assigned to them, are not trusted to hold the sensitive information by their definition.
 /// ...
 ///
 /// ## Example
 /// ```python
-/// ...
-/// ```
+/// public_var = ...  # iflabel {}
+/// secret_var = ...  # iflabel {secret}
 ///
-/// Use instead:
-/// ```python
-/// ...
+/// public_var = secret_var  # Label violation as {secret} -> {} is not allowed
 /// ```
 #[violation]
-pub struct UnauthorisedVariableAssign;
-// {
-//     var1: String,
-//     label1: String,
-//     var2: String,
-//     label2: String
-// }
+pub struct IFInconfidentialVariableAssign {
+    var: String,
+    var_label: Label,
+    expr: String,
+    expr_label: Label,
+}
 
-// TODO: Add authorisation and variable information
-
-impl Violation for UnauthorisedVariableAssign {
+impl Violation for IFInconfidentialVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unauthorised assignment of variable")
@@ -42,21 +41,28 @@ impl Violation for UnauthorisedVariableAssign {
 
 // TODO
 /// IF001
-pub(crate) fn unauthorised_variable_assign(
+pub(crate) fn inconfidential_assign_statement(
     checker: &mut Checker,
-    range: TextRange,
     targets: &Vec<Expr>,
     value: &Box<Expr>,
 ) {
-    if is_unauthorised_assign_statement(checker, targets, value) {
+    if is_inconfidential_assign_statement(checker, targets, value) {
         // Add diagnostics
-        checker
-            .diagnostics
-            .push(Diagnostic::new(UnauthorisedVariableAssign, range));
+        checker.diagnostics.push(Diagnostic::new(
+            IFInconfidentialVariableAssign {
+                var: "var".to_string(), // TODO: Get variable name
+                var_label: Label::default(), // TODO: Get label
+                expr: "expr".to_string(), // TODO: Get expression string
+                expr_label: Label::default(), // TODO: Get label
+            },
+            value.as_ref().range(),
+        ));
     }
 }
 
-fn is_unauthorised_assign_statement(
+/// Check if a variable assignment has correct information flow, in terms of confidentiality.
+/// I.e. the variable label is more restrictive than the value label or the same.
+fn is_inconfidential_assign_statement(
     checker: &mut Checker,
     targets: &Vec<Expr>,
     value: &Box<Expr>,
@@ -86,8 +92,8 @@ fn is_unauthorised_assign_statement(
     // Check information flow lattice, i.e. that the variable label can be converted
     // to the value label i.e. the variable label is more restrictive than the value label
     let is_authorised = can_convert_label(
-        &variable_label.as_ref().unwrap(),
         &value_label.as_ref().unwrap(),
+        &variable_label.as_ref().unwrap(),
     );
 
     return is_authorised;
