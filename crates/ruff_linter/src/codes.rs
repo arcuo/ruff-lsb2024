@@ -969,33 +969,34 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "028") => (RuleGroup::Preview, rules::ruff::rules::InvalidFormatterSuppressionComment),
         (Ruff, "029") => (RuleGroup::Preview, rules::ruff::rules::UnusedAsync),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
+        (Ruff, "101") => (RuleGroup::Preview, rules::ruff::rules::RedirectedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => (RuleGroup::Stable, rules::ruff::rules::StableTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "901") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleSafeFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "902") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleUnsafeFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "903") => (RuleGroup::Stable, rules::ruff::rules::StableTestRuleDisplayOnlyFix),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "911") => (RuleGroup::Preview, rules::ruff::rules::PreviewTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         #[allow(deprecated)]
         (Ruff, "912") => (RuleGroup::Nursery, rules::ruff::rules::NurseryTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "920") => (RuleGroup::Deprecated, rules::ruff::rules::DeprecatedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "921") => (RuleGroup::Deprecated, rules::ruff::rules::AnotherDeprecatedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "930") => (RuleGroup::Removed, rules::ruff::rules::RemovedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "931") => (RuleGroup::Removed, rules::ruff::rules::AnotherRemovedTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "940") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "950") => (RuleGroup::Stable, rules::ruff::rules::RedirectedToTestRule),
-        #[cfg(feature = "test-rules")]
+        #[cfg(any(feature = "test-rules", test))]
         (Ruff, "960") => (RuleGroup::Removed, rules::ruff::rules::RedirectedFromPrefixTestRule),
 
 
@@ -1050,6 +1051,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "110") => (RuleGroup::Preview, rules::refurb::rules::IfExpInsteadOfOrOperator),
         #[allow(deprecated)]
         (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
+        (Refurb, "116") => (RuleGroup::Preview, rules::refurb::rules::FStringNumberFormat),
         (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
         (Refurb, "129") => (RuleGroup::Preview, rules::refurb::rules::ReadlinesInFor),
         #[allow(deprecated)]
@@ -1075,6 +1077,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "180") => (RuleGroup::Preview, rules::refurb::rules::MetaClassABCMeta),
         (Refurb, "181") => (RuleGroup::Preview, rules::refurb::rules::HashlibDigestHex),
         (Refurb, "187") => (RuleGroup::Preview, rules::refurb::rules::ListReverseCopy),
+        (Refurb, "192") => (RuleGroup::Preview, rules::refurb::rules::SortedMinMax),
 
         // flake8-logging
         (Flake8Logging, "001") => (RuleGroup::Stable, rules::flake8_logging::rules::DirectLoggerInstantiation),

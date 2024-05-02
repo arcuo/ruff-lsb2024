@@ -1,11 +1,11 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use std::cell::OnceCell;
-
 use std::fmt;
 use std::fmt::Debug;
+use std::iter::FusedIterator;
 use std::ops::Deref;
 use std::slice::{Iter, IterMut};
+use std::sync::OnceLock;
 
 use bitflags::bitflags;
 use itertools::Itertools;
@@ -471,7 +471,7 @@ pub struct StmtImportFrom {
     pub range: TextRange,
     pub module: Option<Identifier>,
     pub names: Vec<Alias>,
-    pub level: Option<u32>,
+    pub level: u32,
 }
 
 impl From<StmtImportFrom> for Stmt {
@@ -1420,7 +1420,7 @@ impl StringLiteralValue {
         Self {
             inner: StringLiteralValueInner::Concatenated(ConcatenatedStringLiteral {
                 strings,
-                value: OnceCell::new(),
+                value: OnceLock::new(),
             }),
         }
     }
@@ -1782,7 +1782,7 @@ struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceCell<Box<str>>,
+    value: OnceLock<Box<str>>,
 }
 
 impl ConcatenatedStringLiteral {
@@ -3132,6 +3132,7 @@ pub struct TypeParamTypeVar {
     pub range: TextRange,
     pub name: Identifier,
     pub bound: Option<Box<Expr>>,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamTypeVar> for TypeParam {
@@ -3145,6 +3146,7 @@ impl From<TypeParamTypeVar> for TypeParam {
 pub struct TypeParamParamSpec {
     pub range: TextRange,
     pub name: Identifier,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamParamSpec> for TypeParam {
@@ -3158,6 +3160,7 @@ impl From<TypeParamParamSpec> for TypeParam {
 pub struct TypeParamTypeVarTuple {
     pub range: TextRange,
     pub name: Identifier,
+    pub default: Option<Box<Expr>>,
 }
 
 impl From<TypeParamTypeVarTuple> for TypeParam {
@@ -3173,6 +3176,63 @@ pub struct Decorator {
     pub expression: Expr,
 }
 
+/// Enumeration of the two kinds of parameter
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum AnyParameterRef<'a> {
+    /// Variadic parameters cannot have default values,
+    /// e.g. both `*args` and `**kwargs` in the following function:
+    ///
+    /// ```python
+    /// def foo(*args, **kwargs): pass
+    /// ```
+    Variadic(&'a Parameter),
+
+    /// Non-variadic parameters can have default values,
+    /// though they won't necessarily always have them:
+    ///
+    /// ```python
+    /// def bar(a=1, /, b=2, *, c=3): pass
+    /// ```
+    NonVariadic(&'a ParameterWithDefault),
+}
+
+impl<'a> AnyParameterRef<'a> {
+    pub const fn as_parameter(self) -> &'a Parameter {
+        match self {
+            Self::NonVariadic(param) => &param.parameter,
+            Self::Variadic(param) => param,
+        }
+    }
+
+    pub const fn name(self) -> &'a Identifier {
+        &self.as_parameter().name
+    }
+
+    pub const fn is_variadic(self) -> bool {
+        matches!(self, Self::Variadic(_))
+    }
+
+    pub fn annotation(self) -> Option<&'a Expr> {
+        self.as_parameter().annotation.as_deref()
+    }
+
+    pub fn default(self) -> Option<&'a Expr> {
+        match self {
+            Self::NonVariadic(param) => param.default.as_deref(),
+            Self::Variadic(_) => None,
+        }
+    }
+}
+
+impl Ranged for AnyParameterRef<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::NonVariadic(param) => param.range,
+            Self::Variadic(param) => param.range,
+        }
+    }
+}
+
 /// An alternative type of AST `arguments`. This is ruff_python_parser-friendly and human-friendly definition of function arguments.
 /// This form also has advantage to implement pre-order traverse.
 ///
@@ -3183,7 +3243,7 @@ pub struct Decorator {
 ///
 /// NOTE: This type differs from the original Python AST. See: [arguments](https://docs.python.org/3/library/ast.html#ast.arguments).
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Parameters {
     pub range: TextRange,
     pub posonlyargs: Vec<ParameterWithDefault>,
@@ -3194,37 +3254,56 @@ pub struct Parameters {
 }
 
 impl Parameters {
-    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
-    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+    /// Returns an iterator over all non-variadic parameters included in this [`Parameters`] node.
+    ///
+    /// The variadic parameters (`.vararg` and `.kwarg`) can never have default values;
+    /// non-variadic parameters sometimes will.
+    pub fn iter_non_variadic_params(&self) -> impl Iterator<Item = &ParameterWithDefault> {
         self.posonlyargs
             .iter()
             .chain(&self.args)
             .chain(&self.kwonlyargs)
+    }
+
+    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
+    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+        self.iter_non_variadic_params()
             .find(|arg| arg.parameter.name.as_str() == name)
     }
 
-    /// Returns `true` if a parameter with the given name included in this [`Parameters`].
+    /// Returns an iterator over all parameters included in this [`Parameters`] node.
+    pub fn iter(&self) -> ParametersIterator {
+        ParametersIterator::new(self)
+    }
+
+    /// Returns the total number of parameters included in this [`Parameters`] node.
+    pub fn len(&self) -> usize {
+        let Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+        // Safety: a Python function can have an arbitrary number of parameters,
+        // so theoretically this could be a number that wouldn't fit into a usize,
+        // which would lead to a panic. A Python function with that many parameters
+        // is extremely unlikely outside of generated code, however, and it's even
+        // more unlikely that we'd find a function with that many parameters in a
+        // source-code file <=4GB large (Ruff's maximum).
+        posonlyargs
+            .len()
+            .checked_add(args.len())
+            .and_then(|length| length.checked_add(usize::from(vararg.is_some())))
+            .and_then(|length| length.checked_add(kwonlyargs.len()))
+            .and_then(|length| length.checked_add(usize::from(kwarg.is_some())))
+            .expect("Failed to fit the number of parameters into a usize")
+    }
+
+    /// Returns `true` if a parameter with the given name is included in this [`Parameters`].
     pub fn includes(&self, name: &str) -> bool {
-        if self
-            .posonlyargs
-            .iter()
-            .chain(&self.args)
-            .chain(&self.kwonlyargs)
-            .any(|arg| arg.parameter.name.as_str() == name)
-        {
-            return true;
-        }
-        if let Some(arg) = &self.vararg {
-            if arg.name.as_str() == name {
-                return true;
-            }
-        }
-        if let Some(arg) = &self.kwarg {
-            if arg.name.as_str() == name {
-                return true;
-            }
-        }
-        false
+        self.iter().any(|param| param.name() == name)
     }
 
     /// Returns `true` if the [`Parameters`] is empty.
@@ -3234,6 +3313,136 @@ impl Parameters {
             && self.kwonlyargs.is_empty()
             && self.vararg.is_none()
             && self.kwarg.is_none()
+    }
+}
+
+pub struct ParametersIterator<'a> {
+    posonlyargs: Iter<'a, ParameterWithDefault>,
+    args: Iter<'a, ParameterWithDefault>,
+    vararg: Option<&'a Parameter>,
+    kwonlyargs: Iter<'a, ParameterWithDefault>,
+    kwarg: Option<&'a Parameter>,
+}
+
+impl<'a> ParametersIterator<'a> {
+    fn new(parameters: &'a Parameters) -> Self {
+        let Parameters {
+            range: _,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = parameters;
+        Self {
+            posonlyargs: posonlyargs.iter(),
+            args: args.iter(),
+            vararg: vararg.as_deref(),
+            kwonlyargs: kwonlyargs.iter(),
+            kwarg: kwarg.as_deref(),
+        }
+    }
+}
+
+impl<'a> Iterator for ParametersIterator<'a> {
+    type Item = AnyParameterRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        if let Some(param) = posonlyargs.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = args.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = vararg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = kwonlyargs.next() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        kwarg.take().map(AnyParameterRef::Variadic)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        let posonlyargs_len = posonlyargs.len();
+        let args_len = args.len();
+        let vararg_len = usize::from(vararg.is_some());
+        let kwonlyargs_len = kwonlyargs.len();
+        let kwarg_len = usize::from(kwarg.is_some());
+
+        let lower = posonlyargs_len
+            .saturating_add(args_len)
+            .saturating_add(vararg_len)
+            .saturating_add(kwonlyargs_len)
+            .saturating_add(kwarg_len);
+
+        let upper = posonlyargs_len
+            .checked_add(args_len)
+            .and_then(|length| length.checked_add(vararg_len))
+            .and_then(|length| length.checked_add(kwonlyargs_len))
+            .and_then(|length| length.checked_add(kwarg_len));
+
+        (lower, upper)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+}
+
+impl<'a> DoubleEndedIterator for ParametersIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let ParametersIterator {
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
+        } = self;
+
+        if let Some(param) = kwarg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = kwonlyargs.next_back() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        if let Some(param) = vararg.take() {
+            return Some(AnyParameterRef::Variadic(param));
+        }
+        if let Some(param) = args.next_back() {
+            return Some(AnyParameterRef::NonVariadic(param));
+        }
+        posonlyargs.next_back().map(AnyParameterRef::NonVariadic)
+    }
+}
+
+impl<'a> FusedIterator for ParametersIterator<'a> {}
+
+/// We rely on the same invariants outlined in the comment above `Parameters::len()`
+/// in order to implement `ExactSizeIterator` here
+impl<'a> ExactSizeIterator for ParametersIterator<'a> {}
+
+impl<'a> IntoIterator for &'a Parameters {
+    type IntoIter = ParametersIterator<'a>;
+    type Item = AnyParameterRef<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -3406,49 +3615,10 @@ impl Deref for TypeParams {
     }
 }
 
+/// A suite represents a [Vec] of [Stmt].
+///
+/// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-suite>
 pub type Suite = Vec<Stmt>;
-
-impl Parameters {
-    pub fn empty(range: TextRange) -> Self {
-        Self {
-            range,
-            posonlyargs: Vec::new(),
-            args: Vec::new(),
-            vararg: None,
-            kwonlyargs: Vec::new(),
-            kwarg: None,
-        }
-    }
-}
-
-impl ParameterWithDefault {
-    pub fn as_parameter(&self) -> &Parameter {
-        &self.parameter
-    }
-}
-
-impl Parameters {
-    pub fn defaults(&self) -> impl std::iter::Iterator<Item = &Expr> {
-        self.posonlyargs
-            .iter()
-            .chain(self.args.iter())
-            .filter_map(|arg| arg.default.as_ref().map(std::convert::AsRef::as_ref))
-    }
-
-    #[allow(clippy::type_complexity)]
-    pub fn split_kwonlyargs(&self) -> (Vec<&Parameter>, Vec<(&Parameter, &Expr)>) {
-        let mut args = Vec::new();
-        let mut with_defaults = Vec::new();
-        for arg in &self.kwonlyargs {
-            if let Some(ref default) = arg.default {
-                with_defaults.push((arg.as_parameter(), &**default));
-            } else {
-                args.push(arg.as_parameter());
-            }
-        }
-        (args, with_defaults)
-    }
-}
 
 /// The kind of escape command as defined in [IPython Syntax] in the IPython codebase.
 ///
@@ -4207,7 +4377,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprSetComp>(), 40);
         assert_eq!(std::mem::size_of::<ExprSlice>(), 32);
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
-        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 56);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);

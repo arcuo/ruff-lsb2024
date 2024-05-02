@@ -58,14 +58,6 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
             preorder::TraversalSignal::Traverse
         }
     }
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Await(_) => {
-                self.found_await_or_async = true;
-            }
-            _ => preorder::walk_expr(self, expr),
-        }
-    }
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::With(ast::StmtWith { is_async: true, .. }) => {
@@ -82,6 +74,21 @@ impl<'a> preorder::PreorderVisitor<'a> for AsyncExprVisitor {
                 class_def_visit_preorder_except_body(class_def, self);
             }
             _ => preorder::walk_stmt(self, stmt),
+        }
+    }
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Await(_) => {
+                self.found_await_or_async = true;
+            }
+            _ => preorder::walk_expr(self, expr),
+        }
+    }
+    fn visit_comprehension(&mut self, comprehension: &'a ast::Comprehension) {
+        if comprehension.is_async {
+            self.found_await_or_async = true;
+        } else {
+            preorder::walk_comprehension(self, comprehension);
         }
     }
 }

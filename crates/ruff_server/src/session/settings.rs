@@ -11,7 +11,7 @@ pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 /// Resolved client settings for a specific document. These settings are meant to be
 /// used directly by the server, and are *not* a 1:1 representation with how the client
 /// sends them.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
@@ -22,25 +22,39 @@ pub(crate) struct ResolvedClientSettings {
     #[allow(dead_code)]
     disable_rule_comment_enable: bool,
     fix_violation_enable: bool,
-    // TODO(jane): Remove once editor settings resolution is implemented
-    #[allow(dead_code)]
     editor_settings: ResolvedEditorSettings,
 }
 
 /// Contains the resolved values of 'editor settings' - Ruff configuration for the linter/formatter that was passed in via
 /// LSP client settings. These fields are optional because we don't want to override file-based linter/formatting settings
 /// if these were un-set.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-#[allow(dead_code)] // TODO(jane): Remove once editor settings resolution is implemented
 pub(crate) struct ResolvedEditorSettings {
-    lint_preview: Option<bool>,
-    format_preview: Option<bool>,
-    select: Option<Vec<RuleSelector>>,
-    extend_select: Option<Vec<RuleSelector>>,
-    ignore: Option<Vec<RuleSelector>>,
-    exclude: Option<Vec<PathBuf>>,
-    line_length: Option<LineLength>,
+    pub(super) configuration: Option<PathBuf>,
+    pub(super) lint_preview: Option<bool>,
+    pub(super) format_preview: Option<bool>,
+    pub(super) select: Option<Vec<RuleSelector>>,
+    pub(super) extend_select: Option<Vec<RuleSelector>>,
+    pub(super) ignore: Option<Vec<RuleSelector>>,
+    pub(super) exclude: Option<Vec<String>>,
+    pub(super) line_length: Option<LineLength>,
+    pub(super) configuration_preference: ConfigurationPreference,
+}
+
+/// Determines how multiple conflicting configurations should be resolved - in this
+/// case, the configuration from the client settings and configuration from local
+/// `.toml` files (aka 'workspace' configuration).
+#[derive(Clone, Copy, Debug, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ConfigurationPreference {
+    /// Configuration set in the editor takes priority over configuration set in `.toml` files.
+    #[default]
+    EditorFirst,
+    /// Configuration set in `.toml` files takes priority over configuration set in the editor.
+    FilesystemFirst,
+    /// `.toml` files are ignored completely, and only the editor configuration is used.
+    EditorOnly,
 }
 
 /// This is a direct representation of the settings schema sent by the client.
@@ -48,6 +62,7 @@ pub(crate) struct ResolvedEditorSettings {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ClientSettings {
+    configuration: Option<String>,
     fix_all: Option<bool>,
     organize_imports: Option<bool>,
     lint: Option<LintOptions>,
@@ -55,6 +70,7 @@ pub(crate) struct ClientSettings {
     code_action: Option<CodeActionOptions>,
     exclude: Option<Vec<String>>,
     line_length: Option<LineLength>,
+    configuration_preference: Option<ConfigurationPreference>,
 }
 
 /// This is a direct representation of the workspace settings schema,
@@ -214,6 +230,12 @@ impl ResolvedClientSettings {
                 true,
             ),
             editor_settings: ResolvedEditorSettings {
+                configuration: Self::resolve_optional(all_settings, |settings| {
+                    settings
+                        .configuration
+                        .as_ref()
+                        .map(|config_path| OsString::from(config_path.clone()).into())
+                }),
                 lint_preview: Self::resolve_optional(all_settings, |settings| {
                     settings.lint.as_ref()?.preview
                 }),
@@ -251,16 +273,14 @@ impl ResolvedClientSettings {
                         .collect()
                 }),
                 exclude: Self::resolve_optional(all_settings, |settings| {
-                    Some(
-                        settings
-                            .exclude
-                            .as_ref()?
-                            .iter()
-                            .map(|path| PathBuf::from(OsString::from(path)))
-                            .collect(),
-                    )
+                    Some(settings.exclude.as_ref()?.clone())
                 }),
                 line_length: Self::resolve_optional(all_settings, |settings| settings.line_length),
+                configuration_preference: Self::resolve_or(
+                    all_settings,
+                    |settings| settings.configuration_preference,
+                    ConfigurationPreference::EditorFirst,
+                ),
             },
         }
     }
@@ -306,6 +326,10 @@ impl ResolvedClientSettings {
     pub(crate) fn fix_violation(&self) -> bool {
         self.fix_violation_enable
     }
+
+    pub(crate) fn editor_settings(&self) -> &ResolvedEditorSettings {
+        &self.editor_settings
+    }
 }
 
 impl Default for InitializationOptions {
@@ -340,6 +364,7 @@ mod tests {
         assert_debug_snapshot!(options, @r###"
         HasWorkspaces {
             global_settings: ClientSettings {
+                configuration: None,
                 fix_all: Some(
                     false,
                 ),
@@ -389,10 +414,12 @@ mod tests {
                 ),
                 exclude: None,
                 line_length: None,
+                configuration_preference: None,
             },
             workspace_settings: [
                 WorkspaceSettings {
                     settings: ClientSettings {
+                        configuration: None,
                         fix_all: Some(
                             true,
                         ),
@@ -435,6 +462,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
+                        configuration_preference: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -450,6 +478,7 @@ mod tests {
                 },
                 WorkspaceSettings {
                     settings: ClientSettings {
+                        configuration: None,
                         fix_all: Some(
                             true,
                         ),
@@ -494,6 +523,7 @@ mod tests {
                         ),
                         exclude: None,
                         line_length: None,
+                        configuration_preference: None,
                     },
                     workspace: Url {
                         scheme: "file",
@@ -535,6 +565,7 @@ mod tests {
                 disable_rule_comment_enable: false,
                 fix_violation_enable: false,
                 editor_settings: ResolvedEditorSettings {
+                    configuration: None,
                     lint_preview: Some(true),
                     format_preview: None,
                     select: Some(vec![
@@ -544,7 +575,8 @@ mod tests {
                     extend_select: None,
                     ignore: None,
                     exclude: None,
-                    line_length: None
+                    line_length: None,
+                    configuration_preference: ConfigurationPreference::default(),
                 }
             }
         );
@@ -563,6 +595,7 @@ mod tests {
                 disable_rule_comment_enable: true,
                 fix_violation_enable: false,
                 editor_settings: ResolvedEditorSettings {
+                    configuration: None,
                     lint_preview: Some(false),
                     format_preview: None,
                     select: Some(vec![
@@ -572,7 +605,8 @@ mod tests {
                     extend_select: None,
                     ignore: None,
                     exclude: None,
-                    line_length: None
+                    line_length: None,
+                    configuration_preference: ConfigurationPreference::EditorFirst,
                 }
             }
         );
@@ -586,6 +620,7 @@ mod tests {
         GlobalOnly {
             settings: Some(
                 ClientSettings {
+                    configuration: None,
                     fix_all: Some(
                         false,
                     ),
@@ -626,6 +661,7 @@ mod tests {
                             80,
                         ),
                     ),
+                    configuration_preference: None,
                 },
             ),
         }
@@ -648,13 +684,15 @@ mod tests {
                 disable_rule_comment_enable: false,
                 fix_violation_enable: true,
                 editor_settings: ResolvedEditorSettings {
+                    configuration: None,
                     lint_preview: None,
                     format_preview: None,
                     select: None,
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),
-                    exclude: Some(vec![PathBuf::from_str("third_party").unwrap()]),
-                    line_length: Some(LineLength::try_from(80).unwrap())
+                    exclude: Some(vec!["third_party".into()]),
+                    line_length: Some(LineLength::try_from(80).unwrap()),
+                    configuration_preference: ConfigurationPreference::EditorFirst,
                 }
             }
         );

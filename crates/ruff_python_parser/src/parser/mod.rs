@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use bitflags::bitflags;
-use drop_bomb::DebugDropBomb;
 
 use ast::Mod;
 use ruff_python_ast as ast;
@@ -16,7 +15,7 @@ use crate::{
     Mode, ParseError, ParseErrorType, Tok, TokenKind,
 };
 
-use self::expression::AllowStarredExpression;
+use self::expression::ExpressionContext;
 
 mod expression;
 mod helpers;
@@ -27,6 +26,9 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
+/// Represents the parsed source code.
+///
+/// This includes the AST and all of the errors encountered during parsing.
 #[derive(Debug)]
 pub struct Program {
     ast: ast::Mod,
@@ -44,12 +46,12 @@ impl Program {
         &self.parse_errors
     }
 
-    /// Consumes the `Program` and returns the parsed AST.
+    /// Consumes the [`Program`] and returns the parsed AST.
     pub fn into_ast(self) -> ast::Mod {
         self.ast
     }
 
-    /// Consumes the `Program` and returns a list of syntax errors found during parsing.
+    /// Consumes the [`Program`] and returns a list of syntax errors found during parsing.
     pub fn into_errors(self) -> Vec<ParseError> {
         self.parse_errors
     }
@@ -59,11 +61,13 @@ impl Program {
         self.parse_errors.is_empty()
     }
 
+    /// Parse the given Python source code using the specified [`Mode`].
     pub fn parse_str(source: &str, mode: Mode) -> Program {
         let tokens = lex(source, mode);
         Self::parse_tokens(source, tokens.collect(), mode)
     }
 
+    /// Parse a vector of [`LexResult`]s using the specified [`Mode`].
     pub fn parse_tokens(source: &str, tokens: Vec<LexResult>, mode: Mode) -> Program {
         Parser::new(source, mode, TokenSource::new(tokens)).parse_program()
     }
@@ -76,13 +80,6 @@ pub(crate) struct Parser<'src> {
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
-
-    /// This tracks the current expression or statement being parsed.
-    ///
-    /// The `ctx` is also used to create custom error messages and forbid certain
-    /// expressions or statements of being parsed. The `ctx` should be empty after
-    /// an expression or statement is done parsing.
-    ctx: ParserCtxFlags,
 
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
@@ -123,7 +120,6 @@ impl<'src> Parser<'src> {
             mode,
             source,
             errors: Vec::new(),
-            ctx: ParserCtxFlags::empty(),
             tokens,
             recovery_context: RecoveryContext::empty(),
             last_token_end: tokens_range.start(),
@@ -133,49 +129,11 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Consumes the [`Parser`] and returns the parsed [`Program`].
     pub(crate) fn parse_program(mut self) -> Program {
-        let ast = if self.mode == Mode::Expression {
-            let start = self.node_start();
-            let parsed_expr = self.parse_expression_list(AllowStarredExpression::No);
-
-            // All of the remaining newlines are actually going to be non-logical newlines.
-            self.eat(TokenKind::Newline);
-
-            if !self.at(TokenKind::EndOfFile) {
-                self.add_error(
-                    ParseErrorType::UnexpectedExpressionToken,
-                    self.current_token_range(),
-                );
-
-                // TODO(dhruvmanila): How should error recovery work here? Just truncate after the expression?
-                let mut progress = ParserProgress::default();
-                loop {
-                    progress.assert_progressing(&self);
-                    if self.at(TokenKind::EndOfFile) {
-                        break;
-                    }
-                    self.next_token();
-                }
-            }
-
-            self.bump(TokenKind::EndOfFile);
-
-            Mod::Expression(ast::ModExpression {
-                body: Box::new(parsed_expr.expr),
-                range: self.node_range(start),
-            })
-        } else {
-            let body = self.parse_list_into_vec(
-                RecoveryContextKind::ModuleStatements,
-                Parser::parse_statement,
-            );
-
-            self.bump(TokenKind::EndOfFile);
-
-            Mod::Module(ast::ModModule {
-                body,
-                range: self.tokens_range,
-            })
+        let ast = match self.mode {
+            Mode::Expression => Mod::Expression(self.parse_single_expression()),
+            Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
         };
 
         Program {
@@ -184,10 +142,64 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Parses a single expression.
+    ///
+    /// This is to be used for [`Mode::Expression`].
+    ///
+    /// ## Recovery
+    ///
+    /// After parsing a single expression, an error is reported and all remaining tokens are
+    /// dropped by the parser.
+    fn parse_single_expression(&mut self) -> ast::ModExpression {
+        let start = self.node_start();
+        let parsed_expr = self.parse_expression_list(ExpressionContext::default());
+
+        // All remaining newlines are actually going to be non-logical newlines.
+        self.eat(TokenKind::Newline);
+
+        if !self.at(TokenKind::EndOfFile) {
+            self.add_error(
+                ParseErrorType::UnexpectedExpressionToken,
+                self.current_token_range(),
+            );
+
+            // TODO(dhruvmanila): How should error recovery work here? Just truncate after the expression?
+            let mut progress = ParserProgress::default();
+            loop {
+                progress.assert_progressing(self);
+                if self.at(TokenKind::EndOfFile) {
+                    break;
+                }
+                self.next_token();
+            }
+        }
+
+        self.bump(TokenKind::EndOfFile);
+
+        ast::ModExpression {
+            body: Box::new(parsed_expr.expr),
+            range: self.node_range(start),
+        }
+    }
+
+    /// Parses a Python module.
+    ///
+    /// This is to be used for [`Mode::Module`] and [`Mode::Ipython`].
+    fn parse_module(&mut self) -> ast::ModModule {
+        let body = self.parse_list_into_vec(
+            RecoveryContextKind::ModuleStatements,
+            Parser::parse_statement,
+        );
+
+        self.bump(TokenKind::EndOfFile);
+
+        ast::ModModule {
+            body,
+            range: self.tokens_range,
+        }
+    }
+
     fn finish(self) -> Vec<ParseError> {
-        // After parsing, the `ctx` and `ctx_stack` should be empty.
-        // If it's not, you probably forgot to call `clear_ctx` somewhere.
-        assert_eq!(self.ctx, ParserCtxFlags::empty());
         assert_eq!(
             self.current_token_kind(),
             TokenKind::EndOfFile,
@@ -230,29 +242,6 @@ impl<'src> Parser<'src> {
         merged.extend(lex_errors.map(ParseError::from));
 
         merged
-    }
-
-    #[inline]
-    #[must_use]
-    fn set_ctx(&mut self, ctx: ParserCtxFlags) -> SavedParserContext {
-        SavedParserContext {
-            flags: std::mem::replace(&mut self.ctx, ctx),
-            bomb: DebugDropBomb::new(
-                "You must restore the old parser context explicit by calling `restore_ctx`",
-            ),
-        }
-    }
-
-    #[inline]
-    fn restore_ctx(&mut self, current: ParserCtxFlags, mut saved_context: SavedParserContext) {
-        assert_eq!(self.ctx, current);
-        saved_context.bomb.defuse();
-        self.ctx = saved_context.flags;
-    }
-
-    #[inline]
-    fn has_ctx(&self, ctx: ParserCtxFlags) -> bool {
-        self.ctx.intersects(ctx)
     }
 
     /// Returns the start position for a node that starts at the current token.
@@ -672,13 +661,6 @@ impl SequenceMatchPatternParentheses {
     /// Returns `true` if the parentheses are for a list pattern e.g., `case [a, b]: ...`.
     const fn is_list(self) -> bool {
         matches!(self, SequenceMatchPatternParentheses::List)
-    }
-}
-
-bitflags! {
-    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-    struct ParserCtxFlags: u8 {
-        const FOR_TARGET = 1 << 2;
     }
 }
 
@@ -1326,10 +1308,4 @@ impl RecoveryContext {
                 .expect("Expected context to be of a single kind.")
         })
     }
-}
-
-#[derive(Debug)]
-struct SavedParserContext {
-    flags: ParserCtxFlags,
-    bomb: DebugDropBomb,
 }

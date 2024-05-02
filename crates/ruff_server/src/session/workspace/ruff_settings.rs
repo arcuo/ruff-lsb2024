@@ -1,6 +1,10 @@
-use ruff_linter::display_settings;
+use ruff_linter::{
+    display_settings, fs::normalize_path_to, settings::types::FilePattern,
+    settings::types::PreviewMode,
+};
 use ruff_workspace::{
-    pyproject::settings_toml,
+    configuration::{Configuration, FormatConfiguration, LintConfiguration, RuleSelection},
+    pyproject::{find_user_settings_toml, settings_toml},
     resolver::{ConfigurationTransformer, Relativity},
 };
 use std::{
@@ -10,12 +14,14 @@ use std::{
 };
 use walkdir::{DirEntry, WalkDir};
 
+use crate::session::settings::{ConfigurationPreference, ResolvedEditorSettings};
+
 #[derive(Default)]
 pub(crate) struct RuffSettings {
     // settings to pass into the ruff linter
-    pub(crate) linter: ruff_linter::settings::LinterSettings,
+    linter: ruff_linter::settings::LinterSettings,
     // settings to pass into the ruff formatter
-    pub(crate) formatter: ruff_workspace::FormatterSettings,
+    formatter: ruff_workspace::FormatterSettings,
 }
 
 pub(super) struct RuffSettingsIndex {
@@ -36,8 +42,18 @@ impl std::fmt::Display for RuffSettings {
     }
 }
 
+impl RuffSettings {
+    pub(crate) fn linter(&self) -> &ruff_linter::settings::LinterSettings {
+        &self.linter
+    }
+
+    pub(crate) fn formatter(&self) -> &ruff_workspace::FormatterSettings {
+        &self.formatter
+    }
+}
+
 impl RuffSettingsIndex {
-    pub(super) fn new(root: &Path) -> Self {
+    pub(super) fn new(root: &Path, editor_settings: &ResolvedEditorSettings) -> Self {
         let mut index = BTreeMap::default();
 
         for directory in WalkDir::new(root)
@@ -50,7 +66,7 @@ impl RuffSettingsIndex {
                 let Ok(settings) = ruff_workspace::resolver::resolve_root_settings(
                     &pyproject,
                     Relativity::Parent,
-                    &LSPConfigTransformer,
+                    &EditorConfigurationTransformer(editor_settings, root),
                 ) else {
                     continue;
                 };
@@ -64,9 +80,23 @@ impl RuffSettingsIndex {
             }
         }
 
+        let fallback = find_user_settings_toml()
+            .and_then(|user_settings| {
+                ruff_workspace::resolver::resolve_root_settings(
+                    &user_settings,
+                    Relativity::Cwd,
+                    &EditorConfigurationTransformer(editor_settings, root),
+                )
+                .ok()
+            })
+            .unwrap_or_default();
+
         Self {
             index,
-            fallback: Arc::default(),
+            fallback: Arc::new(RuffSettings {
+                formatter: fallback.formatter,
+                linter: fallback.linter,
+            }),
         }
     }
 
@@ -86,13 +116,85 @@ impl RuffSettingsIndex {
     }
 }
 
-struct LSPConfigTransformer;
+struct EditorConfigurationTransformer<'a>(&'a ResolvedEditorSettings, &'a Path);
 
-impl ConfigurationTransformer for LSPConfigTransformer {
+impl<'a> ConfigurationTransformer for EditorConfigurationTransformer<'a> {
     fn transform(
         &self,
-        config: ruff_workspace::configuration::Configuration,
+        filesystem_configuration: ruff_workspace::configuration::Configuration,
     ) -> ruff_workspace::configuration::Configuration {
-        config
+        let ResolvedEditorSettings {
+            configuration,
+            format_preview,
+            lint_preview,
+            select,
+            extend_select,
+            ignore,
+            exclude,
+            line_length,
+            configuration_preference,
+        } = self.0.clone();
+
+        let project_root = self.1;
+
+        let editor_configuration = Configuration {
+            lint: LintConfiguration {
+                preview: lint_preview.map(PreviewMode::from),
+                rule_selections: vec![RuleSelection {
+                    select,
+                    extend_select: extend_select.unwrap_or_default(),
+                    ignore: ignore.unwrap_or_default(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            format: FormatConfiguration {
+                preview: format_preview.map(PreviewMode::from),
+                ..Default::default()
+            },
+            exclude: exclude.map(|exclude| {
+                exclude
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
+            line_length,
+            ..Default::default()
+        };
+
+        // Merge in the editor-specified configuration file, if it exists
+        let editor_configuration = if let Some(config_file_path) = configuration {
+            match open_configuration_file(&config_file_path, project_root) {
+                Ok(config_from_file) => editor_configuration.combine(config_from_file),
+                Err(err) => {
+                    tracing::error!("Unable to find editor-specified configuration file {err}");
+                    editor_configuration
+                }
+            }
+        } else {
+            editor_configuration
+        };
+
+        match configuration_preference {
+            ConfigurationPreference::EditorFirst => {
+                editor_configuration.combine(filesystem_configuration)
+            }
+            ConfigurationPreference::FilesystemFirst => {
+                filesystem_configuration.combine(editor_configuration)
+            }
+            ConfigurationPreference::EditorOnly => editor_configuration,
+        }
     }
+}
+
+fn open_configuration_file(
+    config_path: &Path,
+    project_root: &Path,
+) -> crate::Result<Configuration> {
+    let options = ruff_workspace::pyproject::load_options(config_path)?;
+
+    Configuration::from_options(options, Some(config_path), project_root)
 }

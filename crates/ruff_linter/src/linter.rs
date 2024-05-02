@@ -33,7 +33,7 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rules::pycodestyle;
-#[cfg(feature = "test-rules")]
+#[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
@@ -218,7 +218,7 @@ pub fn check_path(
     }
 
     // Raise violations for internal test rules
-    #[cfg(feature = "test-rules")]
+    #[cfg(any(feature = "test-rules", test))]
     {
         for test_rule in TEST_RULES {
             if !settings.rules.enabled(*test_rule) {
@@ -265,7 +265,13 @@ pub fn check_path(
     }
 
     // Ignore diagnostics based on per-file-ignores.
-    let per_file_ignores = if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
+    let per_file_ignores = if (!diagnostics.is_empty()
+        || settings
+            .rules
+            .iter_enabled()
+            .any(|rule_code| rule_code.lint_source().is_noqa()))
+        && !settings.per_file_ignores.is_empty()
+    {
         fs::ignores_from_path(path, &settings.per_file_ignores)
     } else {
         RuleSet::empty()
