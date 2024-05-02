@@ -193,7 +193,7 @@ impl<'a> Checker<'a> {
             notebook_index,
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
-            information_flow: InformationFlowState::new(&indexer, &locator),
+            information_flow: InformationFlowState::new(indexer, locator),
         }
     }
 }

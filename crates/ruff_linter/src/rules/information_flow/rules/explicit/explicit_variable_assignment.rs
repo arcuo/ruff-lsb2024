@@ -44,7 +44,7 @@ impl Violation for IFInconfidentialVariableAssign {
 pub(crate) fn inconfidential_assign_statement(
     checker: &mut Checker,
     targets: &Vec<Expr>,
-    value: &Box<Expr>,
+    value: &Expr,
 ) {
     if is_inconfidential_assign_statement(checker, targets, value) {
         // Add diagnostics
@@ -55,7 +55,7 @@ pub(crate) fn inconfidential_assign_statement(
                 expr: "expr".to_string(), // TODO: Get expression string
                 expr_label: Label::default(), // TODO: Get label
             },
-            value.as_ref().range(),
+            value.range(),
         ));
     }
 }
@@ -64,20 +64,16 @@ pub(crate) fn inconfidential_assign_statement(
 /// I.e. the variable label is more restrictive than the value label or the same.
 fn is_inconfidential_assign_statement(
     checker: &mut Checker,
-    targets: &Vec<Expr>,
-    value: &Box<Expr>,
+    targets: &[Expr],
+    value: &Expr,
 ) -> bool {
     // Get variable and value names
-    let variable_name = match targets.first() {
-        // TODO: multiple assignment, for now only check first target
-        Some(Expr::Name(expr_name)) => expr_name,
-        _ => return false, // This should not happen in assignments, but check either way
+    let Some(Expr::Name(variable_name)) = targets.first() else {
+        return false
     };
 
-    let value_name = match value.as_ref() {
-        Expr::Name(expr_name) => expr_name, // Check name expressions
-        // TODO:Check for values in Tuples, Lists, Classes, etc.
-        _ => return false,
+    let Expr::Name(value_name) = value else {
+        return false
     };
 
     // Get labels
@@ -92,9 +88,9 @@ fn is_inconfidential_assign_statement(
     // Check information flow lattice, i.e. that the variable label can be converted
     // to the value label i.e. the variable label is more restrictive than the value label
     let is_authorised = can_convert_label(
-        &value_label.as_ref().unwrap(),
-        &variable_label.as_ref().unwrap(),
+        value_label.as_ref().unwrap(),
+        variable_label.as_ref().unwrap(),
     );
 
-    return is_authorised;
+    is_authorised
 }

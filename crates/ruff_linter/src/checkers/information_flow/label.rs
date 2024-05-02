@@ -48,9 +48,9 @@ impl FromStr for Label {
                         .map(|s| s.trim().to_string())
                         .filter(|s| !s.is_empty())
                         .collect::<Vec<String>>();
-                    return Ok(Label { principals });
+                    Ok(Label { principals })
                 }
-                None => return Ok(Label::new_public()),
+                None => Ok(Label::new_public()),
             },
             None => Err(LabelParseError),
         }
@@ -76,8 +76,8 @@ pub(crate) fn can_convert_label(from_label: &Label, to_label: &Label) -> bool {
     }
 
     // If the conv_label has the same principals, then it is not more restrictive
-    return to_label.principals.len() == from_label.principals.len()
-        && to_label.principals != from_label.principals;
+    to_label.principals.len() == from_label.principals.len()
+        && to_label.principals != from_label.principals
 }
 
 #[cfg(test)]
@@ -91,7 +91,7 @@ mod test_labels {
 
     #[test]
     fn test_label_parse_multiple() {
-        let principals = vec!["alice", "bob", "charlie"];
+        let principals = ["alice", "bob", "charlie"];
 
         let mut label_string = String::from("iflabel {");
 
@@ -100,8 +100,8 @@ mod test_labels {
             let formatted_string = format!("{}, {}", label_string, principals[i]);
             label_string = formatted_string;
 
-            let label = (format!("{}}}", label_string)).parse::<Label>().unwrap();
-            assert_eq!(label, Label::new(principals[..i+1].iter().map(|s| s.to_string()).collect()));
+            let label = (format!("{label_string}}}")).parse::<Label>().unwrap();
+            assert_eq!(label, Label::new(principals[..=i].iter().map(|s| (*s).to_string()).collect()));
             i += 1;
         }
     }

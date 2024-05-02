@@ -13,9 +13,8 @@ pub(super) fn get_variable_label(checker: &mut Checker, name: &ExprName) -> Opti
             .shadowed_binding(binding_id)
         {
             // Get [Label] from information_flow
-            match checker.information_flow().get_label(actual_binding_id) {
-                Some(label) => return Some(label),
-                _ => (),
+            if let Some(label) = checker.information_flow().get_label(actual_binding_id) {
+                return Some(label)
             }
         } else {
             // Get [Label] from information_flow
