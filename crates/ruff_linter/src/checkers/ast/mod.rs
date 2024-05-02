@@ -1769,12 +1769,17 @@ impl<'a> Checker<'a> {
         // TODO: Add check for is information flow is enabled
         // TODO: Inherit binding from value
         // TODO: Are there times when we can skip this?
-        self.information_flow.add_variable_label_binding(
-            binding_id,
-            range,
-            self.locator(),
-            self.indexer().comment_ranges(),
-        );
+        match self.semantic.current_scope().shadowed_binding(binding_id) {
+            Some(_) => {} // Don't add binding for already added bindings
+            None => {
+                self.information_flow.add_variable_label_binding(
+                    binding_id,
+                    range,
+                    self.locator(),
+                    self.indexer().comment_ranges(),
+                );
+            }
+        }
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {

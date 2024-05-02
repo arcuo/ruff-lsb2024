@@ -12,13 +12,15 @@ use rustc_hash::FxHashMap;
 lazy_static! {
     static ref PRINCIPAL_REGEX: Regex =
         Regex::new(r"ifprincipals\s*\{\s*(?P<principals>[\w\s,]+)\s*\}").unwrap();
-    static ref LABEL_REGEX: Regex = Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)\s*\}").unwrap();
+    static ref LABEL_REGEX: Regex =
+        Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
 }
 
 /// State of the information flow
 #[derive()]
 pub(crate) struct InformationFlowState {
     // The current principles of the program, e.g. ['alice', 'bob']
+    #[allow(dead_code)]
     principals: Principals,
     // The current scope level queue. The level is updated according to the scope by popping and
     pc: VecDeque<String>,
@@ -26,44 +28,9 @@ pub(crate) struct InformationFlowState {
     variable_map: FxHashMap<BindingId, Label>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub(crate) struct Label {
     principals: Vec<String>,
-}
-
-impl Label {
-    pub(crate) fn new(principals: Vec<String>) -> Self {
-        Self { principals }
-    }
-
-    pub(crate) fn is_public(&self) -> bool {
-        self.principals.is_empty()
-    }
-
-    pub(crate) fn new_public() -> Self {
-        Self { principals: vec![] }
-    }
-}
-
-impl FromStr for Label {
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        match LABEL_REGEX.captures(string) {
-            Some(captures) => {
-                let principals = captures
-                    .name("label")
-                    .unwrap()
-                    .as_str()
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<String>>();
-                Ok(Label { principals })
-            }
-            None => Err(()),
-        }
-    }
-
-    type Err = ();
 }
 
 impl InformationFlowState {
@@ -76,11 +43,16 @@ impl InformationFlowState {
     }
 
     /// Return the current level of the information flow state
-    pub(crate) fn get_pc(&self) -> String {
+    #[allow(dead_code)]
+    pub(crate) fn pc(&self) -> String {
         return match self.pc.front() {
             Some(pc) => pc.clone(),
             None => "".to_string(),
         };
+    }
+    #[allow(dead_code)]
+    pub(crate) fn variable_map(&self) -> &FxHashMap<BindingId, Label> {
+        &self.variable_map
     }
 
     pub(crate) fn get_label(&self, binding_id: BindingId) -> Option<Label> {
@@ -120,11 +92,53 @@ impl InformationFlowState {
                             self.variable_map.insert(binding_id, label);
                         }
                     }
-                    None => {}
+                    None =>
+                    // No label comment, add public label
+                    {
+                        self.variable_map.insert(binding_id, Label::new_public());
+                    }
                 }
             }
         }
     }
+}
+
+impl Label {
+    #[allow(dead_code)]
+    pub(crate) fn new(principals: Vec<String>) -> Self {
+        Self { principals }
+    }
+
+    pub(crate) fn is_public(&self) -> bool {
+        self.principals.is_empty()
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn new_public() -> Self {
+        Self { principals: vec![] }
+    }
+}
+
+impl FromStr for Label {
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        match LABEL_REGEX.captures(string) {
+            Some(captures) => match captures.name("label") {
+                Some(label) => {
+                    let principals = label
+                        .as_str()
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect::<Vec<String>>();
+                    return Ok(Label { principals });
+                }
+                None => return Ok(Label::new_public()),
+            },
+            None => Err(()),
+        }
+    }
+
+    type Err = ();
 }
 
 /// Check labels direction convertion i.e. you can move down in the lattice, not up
@@ -156,10 +170,12 @@ struct Principals {
 }
 
 impl Principals {
+    #[allow(dead_code)]
     fn new(principals: Vec<String>) -> Self {
         Self { principals }
     }
 
+    #[allow(dead_code)]
     fn new_from_str(principals: Vec<&str>) -> Self {
         Self {
             principals: principals.iter().map(|s| s.to_string()).collect(),
@@ -432,5 +448,59 @@ a = 1
         }
 
         assert!(state.variable_map.len() == 0);
+    }
+
+    #[test]
+    fn test_information_flow_state_add_public_label_to_variable_map() {
+        let source: &str = r#"
+a = 1
+b = 2 # iflabel {}
+"#;
+
+        let tokens = tokenize(source, Mode::Module);
+        let locator = Locator::new(source);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let comment_ranges = indexer.comment_ranges();
+        let result = parse_program(source);
+        let mut state = InformationFlowState::new(&indexer, &locator);
+
+        let mut id: BindingId = BindingId::from(0u32);
+
+        match result {
+            Ok(module) => {
+                let stmts = module.body;
+                for stmt in stmts {
+                    match stmt {
+                        Stmt::Assign(StmtAssign {
+                            targets: _,
+                            value: _,
+                            range,
+                        }) => {
+                            let binding_id: BindingId = id.clone();
+                            id = (id.as_u32() + 1).into();
+                            state.add_variable_label_binding(
+                                binding_id,
+                                range,
+                                &locator,
+                                &comment_ranges,
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Err(_) => panic!("Failed to parse module"),
+        }
+
+        assert!(state.variable_map.contains_key(&BindingId::from(0u32)));
+        assert!(state.variable_map.contains_key(&BindingId::from(1u32)));
+        assert_eq!(
+            state.variable_map.get(&BindingId::from(0u32)).unwrap(),
+            &Label::new_public()
+        );
+        assert_eq!(
+            state.variable_map.get(&BindingId::from(1u32)).unwrap(),
+            &Label::new_public()
+        );
     }
 }

@@ -64,17 +64,19 @@ fn is_unauthorised_assign_statement(
     // Get variable and value names
     let variable_name = match targets.first() {
         // TODO: multiple assignment, for now only check first target
-        Some(Expr::Name(expr_name)) => Some(expr_name),
+        Some(Expr::Name(expr_name)) => expr_name,
         _ => return false, // This should not happen in assignments, but check either way
     };
+
     let value_name = match value.as_ref() {
-        Expr::Name(expr_name) => Some(expr_name), // TODO:Check for values in Tuples, Lists, Classes, etc.
+        Expr::Name(expr_name) => expr_name, // Check name expressions
+        // TODO:Check for values in Tuples, Lists, Classes, etc.
         _ => return false,
     };
 
     // Get labels
-    let variable_label = get_variable_label(checker, variable_name.unwrap());
-    let value_label = get_variable_label(checker, value_name.unwrap());
+    let variable_label = get_variable_label(checker, variable_name);
+    let value_label = get_variable_label(checker, value_name);
 
     // No label for the variable or value, then it is not unauthorised
     if variable_label.is_none() || value_label.is_none() {
@@ -83,7 +85,10 @@ fn is_unauthorised_assign_statement(
 
     // Check information flow lattice, i.e. that the variable label can be converted
     // to the value label i.e. the variable label is more restrictive than the value label
-    let is_authorised = can_convert_label(&variable_label.unwrap(), &value_label.unwrap());
+    let is_authorised = can_convert_label(
+        &variable_label.as_ref().unwrap(),
+        &value_label.as_ref().unwrap(),
+    );
 
     return is_authorised;
 }
