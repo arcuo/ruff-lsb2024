@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 use ruff_text_size::TextRange;
 
-use crate::checkers::{ast::Checker, information_flow::can_convert_label};
+use crate::checkers::{ast::Checker, information_flow::label::can_convert_label};
 
 use super::helpers::get_variable_label;
 

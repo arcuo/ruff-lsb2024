@@ -68,7 +68,7 @@ use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
-use super::information_flow::InformationFlowState;
+use super::information_flow::information_flow_state::InformationFlowState;
 
 mod analyze;
 mod annotation;

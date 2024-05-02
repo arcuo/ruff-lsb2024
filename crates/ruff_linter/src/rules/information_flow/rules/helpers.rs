@@ -1,6 +1,6 @@
 use ruff_python_ast::ExprName;
 
-use crate::checkers::{ast::Checker, information_flow::Label};
+use crate::checkers::{ast::Checker, information_flow::label::Label};
 
 /// Fetch the label of a variable in the given scope
 pub(super) fn get_variable_label(checker: &mut Checker, name: &ExprName) -> Option<Label> {
