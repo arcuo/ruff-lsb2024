@@ -72,23 +72,25 @@ impl InformationFlowState {
             // No comment on same line, check previous line
             None => {
                 let start_range = range.start().to_u32();
-                if start_range != 0 {
-                    let previous_line_range = locator.line_range(TextSize::from(start_range - 1));
-                    let label_comment = comment_ranges
-                        .comments_in_range(previous_line_range)
-                        .first();
-                    match label_comment {
-                        Some(comment) => {
-                            let comment_text: &str = &locator.slice(comment).replace("#", "");
-                            if let Ok(label) = comment_text.parse::<Label>() {
-                                self.variable_map.insert(binding_id, label);
-                            }
+                let label_comment = if start_range != 0 {
+                    comment_ranges
+                        .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
+                        .first()
+                } else {
+                    None
+                };
+
+                match label_comment {
+                    Some(comment) => {
+                        let comment_text: &str = &locator.slice(comment).replace("#", "");
+                        if let Ok(label) = comment_text.parse::<Label>() {
+                            self.variable_map.insert(binding_id, label);
                         }
-                        None =>
-                        // No label comment, add public label
-                        {
-                            self.variable_map.insert(binding_id, Label::new_public());
-                        }
+                    }
+                    None =>
+                    // No label comment, add public label
+                    {
+                        self.variable_map.insert(binding_id, Label::new_public());
                     }
                 }
             }
@@ -217,13 +219,14 @@ a = 1
             Err(_) => panic!("Failed to parse module"),
         }
 
-        assert!(state.variable_map.len() == 0);
+        assert!(state.variable_map.len() == 1);
+        assert!(state.variable_map.contains_key(&BindingId::from(0u32)));
+        assert!(state.variable_map.get(&BindingId::from(0u32)).unwrap() == &Label::new_public());
     }
 
     #[test]
     fn test_information_flow_state_add_public_label_to_variable_map() {
-        let source: &str = r#"
-a = 1
+        let source: &str = r#"a = 1
 b = 2 # iflabel {}
 "#;
 
