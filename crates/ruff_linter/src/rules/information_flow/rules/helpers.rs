@@ -3,7 +3,7 @@ use ruff_python_ast::ExprName;
 use crate::checkers::{ast::Checker, information_flow::label::Label};
 
 /// Fetch the label of a variable in the given scope
-pub(super) fn get_variable_label(checker: &mut Checker, name: &ExprName) -> Option<Label> {
+pub(super) fn get_variable_label_by_name(checker: &mut Checker, name: &ExprName) -> Option<Label> {
     // Get shadowed [BindingId] from [Scope] if it exists. We only have to check shadowed bindings,
     // because otherwise the variable is new and does not have a label
     if let Some(binding_id) = checker.semantic().current_scope().get(name.id.as_str()) {
