@@ -31,13 +31,13 @@ bob_var = public_var
 # ## var = expr 
 
 # # IF001: Success - opt are considered public variables
-# alice_bob_var = 69 + 1
+alice_bob_var = 69 + 1
 
 # # IF001: Fail - Information flow from a to b
-# alice_bob_var = bob_var + 1
+alice_bob_var = bob_var + 1
 
 # # IF001: Success Information flow from b to a
-# bob_var = alice_bob_var + 1
+bob_var = alice_bob_var + 1
 
 
 # ## Augmented assignment - i.e "+="

@@ -2,10 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 
-use crate::checkers::{
-    ast::Checker,
-    information_flow::label::{can_convert_label, Label},
-};
+use crate::checkers::{ast::Checker, information_flow::label::Label};
 
 use super::helpers::get_variable_label;
 
@@ -35,28 +32,25 @@ pub struct IFInconfidentialVariableAssign {
 impl Violation for IFInconfidentialVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unauthorised assignment of variable")
+        format!(
+            "Inconfidential assignment to more restrictive variable. Expression `{}` with label `{}` is being assigned to `{}` with label `{}`",
+            self.var, self.var_label.to_string(), self.expr, self.expr_label.to_string()
+        )
     }
 }
 
 // TODO
-/// IF001
+/// IF101
 pub(crate) fn inconfidential_assign_statement(
     checker: &mut Checker,
     targets: &Vec<Expr>,
     value: &Expr,
 ) {
-    if is_inconfidential_assign_statement(checker, targets, value) {
+    if let Some(result) = is_inconfidential_assign_statement(checker, targets, value) {
         // Add diagnostics
-        checker.diagnostics.push(Diagnostic::new(
-            IFInconfidentialVariableAssign {
-                var: "var".to_string(), // TODO: Get variable name
-                var_label: Label::default(), // TODO: Get label
-                expr: "expr".to_string(), // TODO: Get expression string
-                expr_label: Label::default(), // TODO: Get label
-            },
-            value.range(),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(result, value.range()));
     }
 }
 
@@ -66,14 +60,14 @@ fn is_inconfidential_assign_statement(
     checker: &mut Checker,
     targets: &[Expr],
     value: &Expr,
-) -> bool {
+) -> Option<IFInconfidentialVariableAssign> {
     // Get variable and value names
     let Some(Expr::Name(variable_name)) = targets.first() else {
-        return false
+        return None;
     };
 
     let Expr::Name(value_name) = value else {
-        return false
+        return None;
     };
 
     // Get labels
@@ -82,15 +76,21 @@ fn is_inconfidential_assign_statement(
 
     // No label for the variable or value, then it is not unauthorised
     if variable_label.is_none() || value_label.is_none() {
-        return false;
+        return None;
     }
 
-    // Check information flow lattice, i.e. that the variable label can be converted
-    // to the value label i.e. the variable label is more restrictive than the value label
-    let is_authorised = can_convert_label(
-        value_label.as_ref().unwrap(),
-        variable_label.as_ref().unwrap(),
-    );
-
-    is_authorised
+    if !variable_label
+        .as_ref()
+        .unwrap()
+        .is_higher_in_lattice_path(value_label.as_ref().unwrap())
+    {
+        return Some(IFInconfidentialVariableAssign {
+            var: variable_name.id.clone(),
+            var_label: variable_label.unwrap(),
+            expr: value_name.id.clone(),
+            expr_label: value_label.unwrap(),
+        });
+    } else {
+        return None;
+    }
 }

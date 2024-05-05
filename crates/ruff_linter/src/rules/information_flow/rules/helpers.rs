@@ -10,7 +10,7 @@ pub(super) fn get_variable_label(checker: &mut Checker, name: &ExprName) -> Opti
         if let Some(actual_binding_id) = checker
             .semantic()
             .current_scope()
-            .shadowed_binding(binding_id)
+            .shadowed_bindings(binding_id).last()
         {
             // Get [Label] from information_flow
             if let Some(label) = checker.information_flow().get_label(actual_binding_id) {
