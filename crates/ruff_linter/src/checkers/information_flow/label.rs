@@ -25,6 +25,42 @@ impl Label {
     pub(crate) fn new_public() -> Self {
         Self { principals: vec![] }
     }
+
+    pub(crate) fn to_string(&self) -> String {
+        if self.is_public() {
+            return "{}".to_string();
+        }
+        let principals = self.principals.join(", ");
+        format!("{{ {} }}", principals)
+    }
+
+    /// Check labels direction convertion i.e. you can move down in the lattice, not up
+    /// 
+    ///       AB 
+    ///      / \
+    ///     A   B
+    ///      \ /
+    ///       0
+    pub(crate) fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
+        // If the test label is public, then it is never more restrictive
+        if label.is_public() {
+            return true;
+        }
+
+        // If self has more principals, then it is higher in the lattice
+        if self.principals.len() > label.principals.len() {
+            // Check if the label is a subset of the self
+            for principal in &label.principals {
+                if self.principals.contains(principal) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // If the labels have the same principals, then you can "convert" between them
+        label.principals == self.principals
+    }
 }
 #[derive(Debug, Clone)]
 pub(crate) struct LabelParseError;
@@ -57,29 +93,6 @@ impl FromStr for Label {
     }
 }
 
-/// Check labels direction convertion i.e. you can move down in the lattice, not up
-pub(crate) fn can_convert_label(from_label: &Label, to_label: &Label) -> bool {
-    // If the test label is public, then it is never more restrictive
-    if to_label.is_public() {
-        return true;
-    }
-
-    // If the to_label has more principals, then it is more restrictive
-    if from_label.principals.len() > to_label.principals.len() {
-        // Check if the to_label is a subset of the from_label
-        for principal in &to_label.principals {
-            if !from_label.principals.contains(principal) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // If the conv_label has the same principals, then it is not more restrictive
-    to_label.principals.len() == from_label.principals.len()
-        && to_label.principals != from_label.principals
-}
-
 #[cfg(test)]
 mod test_labels {
     use super::Label;
@@ -101,7 +114,10 @@ mod test_labels {
             label_string = formatted_string;
 
             let label = (format!("{label_string}}}")).parse::<Label>().unwrap();
-            assert_eq!(label, Label::new(principals[..=i].iter().map(|s| (*s).to_string()).collect()));
+            assert_eq!(
+                label,
+                Label::new(principals[..=i].iter().map(|s| (*s).to_string()).collect())
+            );
             i += 1;
         }
     }
@@ -118,5 +134,20 @@ mod test_labels {
     #[test]
     fn test_failing_regex_should_throw() {
         assert!("".parse::<Label>().is_err());
+    }
+
+    #[test]
+    fn test_label_convertion() {
+        let label1 = Label::new(vec!["alice".to_string(), "bob".to_string()]);
+        let label2 = Label::new(vec!["alice".to_string()]);
+        let label3 = Label::new(vec!["bob".to_string()]);
+
+        assert!(label1.is_higher_in_lattice_path(&label1));
+        assert!(label1.is_higher_in_lattice_path(&label2));
+        assert!(label1.is_higher_in_lattice_path(&label3));
+
+        assert!(!label2.is_higher_in_lattice_path(&label1));
+        assert!(!label3.is_higher_in_lattice_path(&label1));
+        assert!(!label2.is_higher_in_lattice_path(&label3));
     }
 }
