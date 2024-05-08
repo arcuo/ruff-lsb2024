@@ -1,6 +1,8 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprName, ExprTuple};
+use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::{
     checkers::{
@@ -42,11 +44,15 @@ impl Violation for IFMustIncludeVariableLabel {
 }
 
 /// IF001
-pub(crate) fn must_include_target_variable_label(checker: &mut Checker, target: &Expr) {
+pub(crate) fn must_include_target_variable_label(
+    checker: &mut Checker,
+    target: &Expr,
+    assign_range: &TextRange,
+) {
     match target {
         Expr::Tuple(ExprTuple { elts, .. }) => {
             for element in elts {
-                must_include_target_variable_label(checker, element);
+                must_include_target_variable_label(checker, element, assign_range);
             }
         }
         Expr::Name(ExprName { id, .. }) => {
@@ -70,12 +76,15 @@ pub(crate) fn must_include_target_variable_label(checker: &mut Checker, target: 
                 .is_none()
                 {
                     // Add diagnostics
-                    checker.diagnostics.push(Diagnostic::new(
+                    let diagnostic = Diagnostic::new(
                         IFMustIncludeVariableLabel {
                             var: id.to_string(),
                         },
                         target.range(),
-                    ));
+                    )
+                    .with_fix(add_public_label_inline(*assign_range));
+
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }
@@ -84,8 +93,20 @@ pub(crate) fn must_include_target_variable_label(checker: &mut Checker, target: 
 }
 
 /// IF001
-pub(crate) fn must_include_targets_variable_label(checker: &mut Checker, targets: &Vec<Expr>) {
+pub(crate) fn must_include_targets_variable_label(
+    checker: &mut Checker,
+    targets: &Vec<Expr>,
+    assign_range: &TextRange,
+) {
     for target in targets {
-        must_include_target_variable_label(checker, target);
+        must_include_target_variable_label(checker, target, assign_range);
     }
+}
+
+// IF001 fix
+fn add_public_label_inline(assign_range: TextRange) -> Fix {
+    Fix::safe_edit(Edit::insertion(
+        " # iflabel {}".to_string(),
+        assign_range.end(),
+    ))
 }
