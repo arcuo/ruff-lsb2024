@@ -1452,6 +1452,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     &assign.value,
                 );
             }
+            if checker.enabled(Rule::IFMustIncludeVariableLabel) {
+                information_flow::rules::must_include_targets_variable_label(
+                    checker,
+                    &assign.targets,
+                );
+            }
+
             if checker.enabled(Rule::SelfOrClsAssignment) {
                 for target in targets {
                     pylint::rules::self_or_cls_assignment(checker, target);
@@ -1597,6 +1604,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     information_flow::rules::inconfidential_assign_target_statement(
                         checker, &target, value,
                     );
+                }
+                if checker.enabled(Rule::IFMustIncludeVariableLabel) {
+                    information_flow::rules::must_include_target_variable_label(checker, &target);
                 }
             }
             if checker.enabled(Rule::SelfOrClsAssignment) {

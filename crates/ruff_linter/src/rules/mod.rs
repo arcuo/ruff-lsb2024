@@ -1,4 +1,5 @@
 #![allow(clippy::useless_format)]
+#![allow(unused_imports)] // TODO: Remove this. Just to remove all the ranged imports warnings
 pub mod airflow;
 pub mod eradicate;
 pub mod flake8_2020;

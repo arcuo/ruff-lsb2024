@@ -57,38 +57,51 @@ impl InformationFlowState {
         locator: &Locator,
         comment_ranges: &CommentRanges,
     ) {
-        // Find comment on same line
-        // Regex label
         // Add to variable_map
-        let line_range = locator.line_range(range.start());
-        let label_comment = comment_ranges.comments_in_range(line_range).first();
+        if let Some(label) = read_variable_label_from_source(range, locator, comment_ranges) {
+            self.variable_map.insert(binding_id, label);
+        } else {
+            // No label comment, add public label
+            self.variable_map.insert(binding_id, Label::new_public());
+        }
+    }
+}
 
-        if let Some(comment) = label_comment {
+pub(crate) fn read_variable_label_from_source(
+    range: TextRange,
+    locator: &Locator,
+    comment_ranges: &CommentRanges,
+) -> Option<Label> {
+    // Find comment on same line
+    let line_range = locator.line_range(range.start());
+    let inline_label_comment = comment_ranges.comments_in_range(line_range).first();
+
+    if let Some(comment) = inline_label_comment {
+        let comment_text: &str = &locator.slice(comment).replace('#', "");
+        if let Ok(label) = comment_text.parse::<Label>() {
+            return Some(label);
+        }
+    } else {
+        // Find comment on previous line if it exists
+        let start_range = range.start().to_u32();
+        let preline_label_comment = if start_range != 0 {
+            comment_ranges
+                .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
+                .first()
+        } else {
+            return None;
+        };
+
+        if let Some(comment) = preline_label_comment {
             let comment_text: &str = &locator.slice(comment).replace('#', "");
             if let Ok(label) = comment_text.parse::<Label>() {
-                self.variable_map.insert(binding_id, label);
-            }
-        } else {
-            let start_range = range.start().to_u32();
-            let label_comment = if start_range != 0 {
-                comment_ranges
-                    .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
-                    .first()
+                return Some(label);
             } else {
-                None
-            };
-
-            if let Some(comment) = label_comment {
-                let comment_text: &str = &locator.slice(comment).replace('#', "");
-                if let Ok(label) = comment_text.parse::<Label>() {
-                    self.variable_map.insert(binding_id, label);
-                }
-            } else {
-                // No label comment, add public label
-                self.variable_map.insert(binding_id, Label::new_public());
+                return None;
             }
         }
     }
+    return None;
 }
 
 #[cfg(test)]
