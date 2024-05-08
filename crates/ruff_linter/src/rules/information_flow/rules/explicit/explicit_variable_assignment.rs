@@ -44,12 +44,29 @@ impl Violation for IFInconfidentialVariableAssign {
 
 // TODO
 /// IF101
-pub(crate) fn inconfidential_assign_statement(
+pub(crate) fn inconfidential_assign_targets_statement(
     checker: &mut Checker,
     targets: &Vec<Expr>,
     value: &Expr,
 ) {
-    if let Some(result) = is_inconfidential_assign_statement(checker, targets, value) {
+    if let Some(target) = targets.first() {
+        // TODO Handle multiple targets
+        if let Some(result) = is_inconfidential_assign_statement(checker, target, value) {
+            // Add diagnostics
+            checker
+                .diagnostics
+                .push(Diagnostic::new(result, value.range()));
+        }
+    }
+}
+
+/// IF101
+pub(crate) fn inconfidential_assign_target_statement(
+    checker: &mut Checker,
+    target: &Expr,
+    value: &Expr,
+) {
+    if let Some(result) = is_inconfidential_assign_statement(checker, target, value) {
         // Add diagnostics
         checker
             .diagnostics
@@ -61,16 +78,24 @@ fn get_most_restrictive_label_from_list_of_expressions(
     checker: &mut Checker,
     expressions: &Vec<Expr>,
 ) -> Option<Label> {
-    let mut label = None;
+    let mut curr_label: Option<Label> = None;
     for expr in expressions {
         if let Some(expr_label) = get_label_for_expression(checker, &expr) {
-            if expr_label.is_higher_in_lattice_path(label.as_ref().unwrap()) {
-                label = Some(expr_label);
+            if let Some(label) = curr_label.clone() {
+                if expr_label.is_higher_in_lattice_path(&label) {
+                    curr_label = Some(expr_label);
+                }
+            } else {
+                curr_label = Some(expr_label);
             }
         }
     }
 
-    label
+    if let Some(curr_label) = curr_label.clone() {
+        return Some(curr_label.clone());
+    }
+
+    None
 }
 
 fn get_higher_of_two_labels(label1: Option<Label>, label2: Option<Label>) -> Option<Label> {
@@ -201,11 +226,11 @@ fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Option<Label>
 /// I.e. the variable label is more restrictive than the value label or the same.
 fn is_inconfidential_assign_statement(
     checker: &mut Checker,
-    targets: &[Expr],
+    target: &Expr,
     value: &Expr,
 ) -> Option<IFInconfidentialVariableAssign> {
     // Get variable and value names
-    let Some(Expr::Name(variable_name)) = targets.first() else {
+    let Expr::Name(variable_name) = target else {
         return None;
     };
 

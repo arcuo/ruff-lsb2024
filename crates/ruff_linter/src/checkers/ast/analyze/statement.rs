@@ -1081,7 +1081,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::misplaced_bare_raise(checker, raise);
             }
         }
-        Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
+        Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, value, .. }) => {
+            if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+                information_flow::rules::inconfidential_assign_target_statement(
+                    checker, &target, &value,
+                );
+            }
             if checker.enabled(Rule::SelfOrClsAssignment) {
                 pylint::rules::self_or_cls_assignment(checker, target);
             }
@@ -1441,7 +1446,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
             if checker.enabled(Rule::IFInconfidentialVariableAssign) {
-                information_flow::rules::inconfidential_assign_statement(
+                information_flow::rules::inconfidential_assign_targets_statement(
                     checker,
                     &assign.targets,
                     &assign.value,
@@ -1586,6 +1591,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         value,
                         Some(annotation),
                         stmt,
+                    );
+                }
+                if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+                    information_flow::rules::inconfidential_assign_target_statement(
+                        checker, &target, value,
                     );
                 }
             }

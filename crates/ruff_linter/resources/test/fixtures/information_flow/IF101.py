@@ -4,54 +4,119 @@
 
 ## var = opt
 
-# IF001: Success, opt are considered public variables
+# IF101: Success, opt are considered public variables
 public_var = 0 # iflabel {}
 bob_var = 42 # iflabel {bob}
 alice_bob_var = 69 # iflabel {alice,bob}
 
 ## var = var
 
-# IF001: Success - Information flow from {bob} to {alice,bob}. 
+# IF101: Success - Information flow from {bob} to {alice,bob}. 
 alice_bob_var = bob_var
 
-# IF001: Fail - Information flow from {alice,bob} to {bob}
+# IF101: Fail - Information flow from {alice,bob} to {bob}
 bob_var = alice_bob_var
 
-# IF001: Fail - public var are less restrictive than alice_bob_var
+# IF101: Fail - public var are less restrictive than alice_bob_var
 public_var = alice_bob_var
 
-# IF001: Fail - public var are less restrictive than bob_var
+# IF101: Fail - public var are less restrictive than bob_var
 public_var = bob_var
 
-# IF001: Success - Public variables can flow to more restrictive variables
+# IF101: Success - Public variables can flow to more restrictive variables
 alice_bob_var = public_var
 bob_var = public_var
 
 
 # ## var = expr 
 
-# # IF001: Success - opt are considered public variables
+# # IF101: Success - opt are considered public variables
 alice_bob_var = 69 + 1
 
-# # IF001: Fail - Information flow from a to b
-alice_bob_var = bob_var + 1
-
-# # IF001: Success Information flow from b to a
+# # IF101: Fail Information flow from b to a
 bob_var = alice_bob_var + 1
 
-
-# ## Augmented assignment - i.e "+="
-
-# # IF001: Success - opt are considered public variables
-# alice_bob_var += 1
-
-# # IF001: Fail - Information flow from a to b
-# alice_bob_var += bob_var
-
-# # IF001: Success Information flow from b to a
-# bob_var += alice_bob_var
+# # IF101: Success - Information flow from a to b
+alice_bob_var = bob_var + 1
 
 
-## TODO: tuples, lists, dicts, sets
+## Augmented assignment - i.e "+="
+
+# IF101: Success - opt are considered public variables
+alice_bob_var += 1
+
+# IF101: Success - Information flow from a to b
+alice_bob_var += bob_var
+
+# IF101: Fail Information flow from b to a
+bob_var += alice_bob_var
+
+# IF101: Fail Information flow from b to a
+public_var += bob_var
+
+## Annotated assignment - i.e ": int ="
+
+# IF101: Success - opt are considered public variables
+alice_bob_var: int = 69
+
+# IF101: Fail Information flow from b to a
+bob_var: int = alice_bob_var
+
+# IF101: Success - Information flow from a to b
+alice_bob_var: int = bob_var
+
+## Multiple assignment TODO
+
+# public_var, bob_var = 1, 2
+# alice_bob_var, bob_var = 1, 2
+
+## IF101: Fail - Information flow from {alice,bob} to {bob}
+# alice_bob_var, bob_var = 1, alice_bob_var
+# alice_bob_var, bob_var = alice_bob_var
+
+
+# List assignment
+
+# IF101: Success - Information flow from literal to {bob}
+bob_var = [1, 2, 3]
+
+# IF101: Fail - Information flow from {alice,bob} to {bob}
+bob_var = [1, 2, alice_bob_var]
+
+# IF101: Fail - Information flow from {bob} to {public}
+public_var = [1, 2, bob_var]
+
+# Tuple assignment
+
+# IF101: Success - Information flow from literal to {bob}
+bob_var = (1, 2, 3)
+
+# IF101: Fail - Information flow from {alice,bob} to {bob}
+bob_var = (1, 2, alice_bob_var)
+
+# IF101: Fail - Information flow from {bob} to {public}
+public_var = (1, 2, bob_var)
+
+# Set assignment
+
+# IF101: Success - Information flow from literal to {bob}
+bob_var = {1, 2, 3}
+
+# IF101: Fail - Information flow from {alice,bob} to {bob}
+bob_var = {1, 2, alice_bob_var}
+
+# IF101: Fail - Information flow from {bob} to {public}
+public_var = {1, 2, bob_var}
+
+# Dict assignment
+
+# IF101: Success - Information flow from literal to {bob}
+bob_var = {1: 2, 3: 4}
+
+# IF101: Fail - Information flow from {alice,bob} to {bob}
+bob_var = {1: 2, 3: alice_bob_var}
+
+# IF101: Fail - Information flow from {bob} to {public}
+public_var = {1: 2, 3: bob_var}
 
 ## TODO: var = func() Might be a separate rule
