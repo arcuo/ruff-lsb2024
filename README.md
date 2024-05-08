@@ -152,7 +152,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.4.2
+  rev: v0.4.3
   hooks:
     # Run the linter.
     - id: ruff
@@ -425,7 +425,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel),
     [ONNX Runtime](https://github.com/microsoft/onnxruntime),
     [LightGBM](https://github.com/microsoft/LightGBM))
-- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
+- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))

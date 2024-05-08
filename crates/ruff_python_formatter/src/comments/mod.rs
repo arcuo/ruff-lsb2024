@@ -96,7 +96,6 @@ pub(crate) use format::{
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
 use ruff_source_file::Locator;
@@ -195,9 +194,9 @@ type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 /// Cloning `comments` is cheap as it only involves bumping a reference counter.
 #[derive(Debug, Clone)]
 pub(crate) struct Comments<'a> {
-    /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [crate::Formatter].
-    /// Independent lifetimes are necessary to support the use case where a (formattable object)[crate::Format]
-    /// iterates over all comments, and writes them into the [crate::Formatter] (mutably borrowing the [crate::Formatter] and in turn its context).
+    /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [`crate::Formatter`].
+    /// Independent lifetimes are necessary to support the use case where a (formattable object)[`crate::Format`]
+    /// iterates over all comments, and writes them into the [`crate::Formatter`] (mutably borrowing the [`crate::Formatter`] and in turn its context).
     ///
     /// ```block
     /// for leading in f.context().comments().leading_comments(node) {
@@ -407,6 +406,20 @@ impl<'a> Comments<'a> {
     /// normally if `node` is the first or last node of a suppression range.
     #[cfg(debug_assertions)]
     pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
+        use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+
+        struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
+
+        impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
+            fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
+                for comment in self.0.leading_dangling_trailing(node) {
+                    comment.mark_formatted();
+                }
+
+                TraversalSignal::Traverse
+            }
+        }
+
         for dangling in self.dangling(node) {
             dangling.mark_formatted();
         }
@@ -450,18 +463,6 @@ struct CommentsData<'a> {
 
     /// We need those for backwards lexing
     comment_ranges: &'a CommentRanges,
-}
-
-struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
-
-impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
-    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-        for comment in self.0.leading_dangling_trailing(node) {
-            comment.mark_formatted();
-        }
-
-        TraversalSignal::Traverse
-    }
 }
 
 pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {

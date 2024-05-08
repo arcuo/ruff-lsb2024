@@ -5,6 +5,7 @@ use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, ExprSlice, ExprSubscript, ExprTuple, Parameters, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
@@ -28,7 +29,7 @@ use crate::importer::{ImportRequest, Importer};
 /// import functools
 ///
 /// nums = [1, 2, 3]
-/// sum = functools.reduce(lambda x, y: x + y, nums)
+/// total = functools.reduce(lambda x, y: x + y, nums)
 /// ```
 ///
 /// Use instead:
@@ -37,10 +38,8 @@ use crate::importer::{ImportRequest, Importer};
 /// import operator
 ///
 /// nums = [1, 2, 3]
-/// sum = functools.reduce(operator.add, nums)
+/// total = functools.reduce(operator.add, nums)
 /// ```
-///
-/// ## References
 #[violation]
 pub struct ReimplementedOperator {
     operator: Operator,
@@ -71,6 +70,13 @@ impl Violation for ReimplementedOperator {
 
 /// FURB118
 pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
+    // Ignore methods.
+    if target.kind() == FunctionLikeKind::Function {
+        if checker.semantic().current_scope().kind.is_class() {
+            return;
+        }
+    }
+
     let Some(params) = target.parameters() else {
         return;
     };
@@ -113,7 +119,7 @@ impl Ranged for FunctionLike<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Lambda(expr) => expr.range(),
-            Self::Function(stmt) => stmt.range(),
+            Self::Function(stmt) => stmt.identifier(),
         }
     }
 }
