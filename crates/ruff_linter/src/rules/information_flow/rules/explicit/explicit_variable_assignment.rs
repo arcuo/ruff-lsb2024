@@ -164,8 +164,15 @@ fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Option<Label>
         Expr::BoolOp(ExprBoolOp { values, .. })
         | Expr::Tuple(ExprTuple { elts: values, .. })
         | Expr::List(ExprList { elts: values, .. })
-        | Expr::Dict(ExprDict { values, .. })
         | Expr::Set(ExprSet { elts: values, .. }) => {
+            get_most_restrictive_label_from_list_of_expressions(checker, values)
+        }
+
+        Expr::Dict(ExprDict { items, .. }) => {
+            let values: &Vec<Expr> = &items
+                .iter()
+                .map(|item| item.value.clone())
+                .collect::<Vec<_>>();
             get_most_restrictive_label_from_list_of_expressions(checker, values)
         }
 
