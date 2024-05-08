@@ -23,7 +23,7 @@ impl Principals {
     #[allow(dead_code)]
     pub(crate) fn new_from_str(principals: Vec<&str>) -> Self {
         Self {
-            principals: principals.iter().map(|s| s.to_string()).collect(),
+            principals: principals.iter().map(|s| (*s).to_string()).collect(),
         }
     }
 
@@ -83,13 +83,13 @@ pub(super) fn initiate_principals(indexer: &Indexer, locator: &Locator) -> Princ
     let mut principals = Principals::new_empty();
     // TODO: Implement logic to extract principals from block comments with comment_ranges.block_comments()
     for range in indexer.comment_ranges() {
-        let comment = locator.slice(range).replace("#", "");
+        let comment = locator.slice(range).replace('#', "");
         if let Ok(_principals) = comment.parse::<Principals>() {
             principals.concat(&_principals);
         }
     }
 
-    return principals;
+    principals
 }
 
 #[cfg(test)]

@@ -655,6 +655,45 @@ impl Expr {
             _ => None,
         }
     }
+
+    /// Returns the [`TextRange`] of the expression.
+    pub fn range(&self) -> TextRange {
+        match self {
+            // Match all expressions
+            Expr::Attribute(ExprAttribute { range, .. })
+            | Expr::Name(ExprName { range, .. })
+            | Expr::NumberLiteral(ExprNumberLiteral { range, .. })
+            | Expr::StringLiteral(ExprStringLiteral { range, .. })
+            | Expr::BytesLiteral(ExprBytesLiteral { range, .. })
+            | Expr::BooleanLiteral(ExprBooleanLiteral { range, .. })
+            | Expr::NoneLiteral(ExprNoneLiteral { range, .. })
+            | Expr::EllipsisLiteral(ExprEllipsisLiteral { range, .. })
+            | Expr::Subscript(ExprSubscript { range, .. })
+            | Expr::Starred(ExprStarred { range, .. })
+            | Expr::Tuple(ExprTuple { range, .. })
+            | Expr::List(ExprList { range, .. })
+            | Expr::Slice(ExprSlice { range, .. })
+            | Expr::Call(ExprCall { range, .. })
+            | Expr::FString(ExprFString { range, .. })
+            | Expr::Compare(ExprCompare { range, .. })
+            | Expr::YieldFrom(ExprYieldFrom { range, .. })
+            | Expr::BoolOp(ExprBoolOp { range, .. })
+            | Expr::Named(ExprNamed { range, .. })
+            | Expr::BinOp(ExprBinOp { range, .. })
+            | Expr::UnaryOp(ExprUnaryOp { range, .. })
+            | Expr::Lambda(ExprLambda { range, .. })
+            | Expr::If(ExprIf { range, .. })
+            | Expr::Dict(ExprDict { range, .. })
+            | Expr::Set(ExprSet { range, .. })
+            | Expr::ListComp(ExprListComp { range, .. })
+            | Expr::SetComp(ExprSetComp { range, .. })
+            | Expr::DictComp(ExprDictComp { range, .. })
+            | Expr::Generator(ExprGenerator { range, .. })
+            | Expr::Await(ExprAwait { range, .. })
+            | Expr::Yield(ExprYield { range, .. })
+            | Expr::IpyEscapeCommand(ExprIpyEscapeCommand { range, .. }) => *range,
+        }
+    }
 }
 
 /// An AST node used to represent a IPython escape command at the expression level.

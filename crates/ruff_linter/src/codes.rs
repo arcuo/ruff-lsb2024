@@ -1086,8 +1086,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
 
 
-        // Information flow rules
-        (InformationFlow, "001") => (RuleGroup::Stable, rules::information_flow::rules::UnauthorisedVariableAssign),
+        // Information flow basic rules (001-...)
+
+        // Information flow explicit rules (101-...)
+        (InformationFlow, "101") => (RuleGroup::Stable, rules::information_flow::rules::IFInconfidentialVariableAssign),
+
+        // Information flow implicit rules (201-...)
 
         _ => return None,
     })
