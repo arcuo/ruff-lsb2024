@@ -1,3 +1,4 @@
+use ruff_python_ast::{AnyParameterRef, Expr, Identifier};
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 
@@ -22,6 +23,8 @@ pub(crate) struct InformationFlowState {
     pc: VecDeque<String>,
     // Map from variable name to
     variable_map: FxHashMap<BindingId, Label>,
+    // Map from function name to parameter labels
+    function_map: FxHashMap<BindingId, Vec<Label>>,
 }
 
 impl InformationFlowState {
@@ -29,6 +32,7 @@ impl InformationFlowState {
         Self {
             principals: initiate_principals(indexer, locator),
             variable_map: FxHashMap::default(),
+            function_map: FxHashMap::default(),
             pc: VecDeque::default(),
         }
     }
@@ -96,11 +100,15 @@ impl InformationFlowState {
             }
         }
     }
+
+    pub(crate) fn test_function(&self, param: &AnyParameterRef) {
+        println!("{:?}", param);
+    }
 }
 
 #[cfg(test)]
 mod information_flow_state_tests {
-    use ruff_python_ast::{Stmt, StmtAssign};
+    use ruff_python_ast::{Stmt, StmtAssign, StmtFunctionDef};
     use ruff_python_parser::{parse_program, tokenize, Mode};
 
     use super::*;
@@ -275,5 +283,64 @@ b = 2 # iflabel {}
             state.variable_map.get(&BindingId::from(1u32)).unwrap(),
             &Label::new_public()
         );
+    }
+
+    #[test]
+    fn test_information_flow_state_function() {
+        let source: &str = r#"
+# iflabel fn ({secret}, {public}) {secret}
+def help(a,b):
+  # Checking internal run of the function using arg labels
+  some_outer_secret_value = a # OK
+  some_outer_public_value = a # FAIL a is secret
+  return public # OK
+  return secret # OK but not if return was "public"
+
+secret = 1 # iflabel {secret}
+public = 2 # iflabel {secret}
+
+# Checking args
+help(secret, public) # OK
+help(public, secret) # Fail b has a public label
+
+# Checking return
+secret = help(secret, public) # OK
+public = help(secret, public) # Fail public cannot be assigned a secret return value from help
+"#;
+
+        let tokens = tokenize(source, Mode::Module);
+        let locator = Locator::new(source);
+        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let comment_ranges = indexer.comment_ranges();
+        let result = parse_program(source);
+        let mut state = InformationFlowState::new(&indexer, &locator);
+
+        let mut id: BindingId = BindingId::from(0u32);
+
+        match result {
+            Ok(module) => {
+                let stmts = module.body;
+                for stmt in stmts {
+                    match stmt {
+                        Stmt::FunctionDef(StmtFunctionDef {
+                            range,
+                            is_async,
+                            decorator_list,
+                            name,
+                            type_params,
+                            parameters,
+                            returns,
+                            body,
+                        }) => {
+                            for param in &*parameters {
+                                state.test_function(&param);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Err(_) => panic!("Failed to parse module"),
+        }
     }
 }

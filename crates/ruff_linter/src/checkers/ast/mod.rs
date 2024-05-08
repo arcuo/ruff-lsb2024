@@ -616,6 +616,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 for parameter in &**parameters {
                     if let Some(expr) = parameter.annotation() {
+                        self.information_flow.test_function(&parameter);
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
                             singledispatch = false;
