@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprName, ExprTuple};
 use ruff_source_file::Locator;
@@ -34,12 +34,18 @@ pub struct IFMustIncludeVariableLabel {
 }
 
 impl Violation for IFMustIncludeVariableLabel {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
       "Missing variable label for `{}` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel {{ ... }}` or `iflabel {{}}` for public.",
       self.var
     )
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Add explicit public label to the variable `{}`", self.var))
     }
 }
 
