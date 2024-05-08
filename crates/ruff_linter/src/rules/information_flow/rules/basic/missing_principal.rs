@@ -29,6 +29,13 @@ use crate::{
 /// public_var = ...  # iflabel {A}
 ///
 /// ```
+/// 
+/// ## Fix
+/// Add the missing principal to the principals list.
+/// ```python
+/// # ifprincipals {A, C}
+/// ...
+/// ```
 #[violation]
 pub struct IFMissingPrincipal {
     var: String,
