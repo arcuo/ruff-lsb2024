@@ -49,14 +49,8 @@ pub(crate) fn inconfidential_assign_targets_statement(
     targets: &Vec<Expr>,
     value: &Expr,
 ) {
-    if let Some(target) = targets.first() {
-        // TODO Handle multiple targets
-        if let Some(result) = is_inconfidential_assign_statement(checker, target, value) {
-            // Add diagnostics
-            checker
-                .diagnostics
-                .push(Diagnostic::new(result, value.range()));
-        }
+    for target in targets {
+        inconfidential_assign_target_statement(checker, target, value);
     }
 }
 
@@ -66,11 +60,21 @@ pub(crate) fn inconfidential_assign_target_statement(
     target: &Expr,
     value: &Expr,
 ) {
-    if let Some(result) = is_inconfidential_assign_statement(checker, target, value) {
-        // Add diagnostics
-        checker
-            .diagnostics
-            .push(Diagnostic::new(result, value.range()));
+    match target {
+        Expr::Tuple(ExprTuple { elts, .. }) => {
+            for element in elts {
+                inconfidential_assign_target_statement(checker, element, value);
+            }
+        }
+        Expr::Name(_) => {
+            if let Some(result) = is_inconfidential_assign_statement(checker, target, value) {
+                // Add diagnostics
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(result, target.range()));
+            }
+        }
+        _ => {}
     }
 }
 
