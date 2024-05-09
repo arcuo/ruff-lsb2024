@@ -6,7 +6,6 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::types::Node;
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;

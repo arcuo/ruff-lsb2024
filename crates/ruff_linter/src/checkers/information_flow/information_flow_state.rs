@@ -19,7 +19,7 @@ pub(crate) struct InformationFlowState {
     #[allow(dead_code)]
     principals: Principals,
     // The current scope level queue. The level is updated according to the scope by popping and
-    pc: VecDeque<String>,
+    pc: VecDeque<Label>,
     // Map from variable name to
     variable_map: FxHashMap<BindingId, Label>,
 }
@@ -34,11 +34,21 @@ impl InformationFlowState {
     }
 
     /// Return the current level of the information flow state
-    pub(crate) fn pc(&self) -> String {
+    pub(crate) fn get_pc(&self) -> Label {
         return match self.pc.front() {
             Some(pc) => pc.clone(),
-            None => String::new(),
+            None => Label::new_public(),
         };
+    }
+
+    /// Set the current level of the information flow state
+    pub(crate) fn set_pc(&mut self, pc: Label) {
+        self.pc.push_front(pc);
+    }
+
+    /// Pop the current level of the information flow state
+    pub(crate) fn pop_pc(&mut self) {
+        self.pc.pop_front();
     }
 
     pub(crate) fn variable_map(&self) -> &FxHashMap<BindingId, Label> {

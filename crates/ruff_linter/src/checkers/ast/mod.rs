@@ -68,6 +68,7 @@ use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
+use super::information_flow::helper::get_label_for_expression;
 use super::information_flow::information_flow_state::InformationFlowState;
 
 mod analyze;
@@ -1789,6 +1790,12 @@ impl<'a> Checker<'a> {
         self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
         self.semantic.flags = snapshot;
+
+        // Get label of the statement and add to information_flow.pc
+        if let Some(label) = get_label_for_expression(self, expr) {
+            self.information_flow.set_pc(label); 
+            // TODO: We must check the highest label in the expression because of nested if
+        }
     }
 
     /// Visit an [`ElifElseClause`]
