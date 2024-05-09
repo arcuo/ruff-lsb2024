@@ -13,8 +13,8 @@ use super::helpers::get_variable_label_by_name;
 /// Check confidentiality of information flow in variable assignments.
 ///
 /// ## Why is this bad?
-/// Public variables or variables with labels that are cannot flow in the information flow lattice
-/// to the value being assigned to them, are not trusted to hold the sensitive information by their definition.
+/// Public variables or variables with labels that are lower in the information flow lattice cannot flow up in the lattice
+/// to the value being assigned to them. Due to the fact that they are not trusted to hold the sensitive information by their definition.
 /// ...
 ///
 /// ## Example
