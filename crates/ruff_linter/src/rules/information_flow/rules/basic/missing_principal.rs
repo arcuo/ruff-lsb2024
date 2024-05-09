@@ -1,13 +1,17 @@
+use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{Expr, ExprName, ExprTuple};
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::{
     checkers::{
         ast::Checker,
-        information_flow::{information_flow_state::read_variable_label_from_source, label::Label},
+        information_flow::{
+            information_flow_state::read_variable_label_from_source, label::Label,
+            principals::Principals,
+        },
     },
     rules::information_flow::rules::helpers::get_variable_label_by_name,
 };
@@ -29,7 +33,7 @@ use crate::{
 /// public_var = ...  # iflabel {A}
 ///
 /// ```
-/// 
+///
 /// ## Fix
 /// Add the missing principal to the principals list.
 /// ```python
@@ -38,7 +42,9 @@ use crate::{
 /// ```
 #[violation]
 pub struct IFMissingPrincipal {
-    var: String,
+    label_stmt: String,
+    missing_principal: String,
+    global_principals: Principals,
 }
 
 impl Violation for IFMissingPrincipal {
@@ -46,35 +52,65 @@ impl Violation for IFMissingPrincipal {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        todo!();
         format!(
-      "Missing variable label for `{}` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel {{ ... }}` or `iflabel {{}}` for public.",
-      self.var
-    )
+            "Missing principal `{}` in the principals list for `{}`",
+            self.missing_principal, self.label_stmt
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
-        todo!();
         Some(format!(
-            "Add explicit public label to the variable `{}`",
-            self.var
+            "Add principal `{}` to the top of the file `# ifprincipals {{{}}}`", // TODO: Add principals via config?
+            self.missing_principal,
+            self.global_principals.principals.join(", ") + ", " + &self.missing_principal
         ))
     }
 }
 
 /// IF002
-pub(crate) fn missing_principal_from_label(
-    checker: &mut Checker,
-    target: &Expr,
-    assign_range: &TextRange,
-) {
-}
+pub(crate) fn missing_principal_from_label(checker: &mut Checker, assign_range: TextRange) {
+    let Some((label, comment_range)) = read_variable_label_from_source(
+        assign_range,
+        checker.locator(),
+        checker.indexer().comment_ranges(),
+    ) else {
+        return; // No label found, so no principal to check
+    };
 
-// IF002 fix add missing principal
-fn add_principle(assign_range: TextRange) -> Fix {
-    todo!();
-    // Fix::safe_edit(Edit::insertion(
-    //     " # iflabel {}".to_string(),
-    //     assign_range.end(),
-    // ))
+    let global_principals = checker.information_flow().principals().clone();
+    let label_principals = &label.principals;
+
+    for principal in label_principals {
+        if !global_principals.principals.contains(&principal) {
+            {
+                let global_principals: &Principals = &global_principals;
+                // Find the range of the label
+                let comment_text = &checker.locator().slice(comment_range);
+                let principal_range =
+                    match TryInto::<TextSize>::try_into(comment_text.find(principal).unwrap()) {
+                        Ok(label_start_index) => {
+                            let principal_range = TextRange::new(
+                                comment_range.start() + label_start_index,
+                                comment_range.start() + label_start_index + TextSize::of(principal),
+                            );
+                            principal_range
+                        }
+                        Err(_) => {
+                            comment_range // If the principal is not found, then the range is the whole comment
+                        }
+                    };
+
+                let diagnostic = Diagnostic::new(
+                    IFMissingPrincipal {
+                        label_stmt: label.to_string(),
+                        missing_principal: principal.clone(),
+                        global_principals: global_principals.clone(),
+                    },
+                    principal_range,
+                );
+
+                checker.diagnostics.push(diagnostic);
+            };
+        }
+    }
 }

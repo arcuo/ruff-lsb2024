@@ -1090,6 +1090,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // Information flow basic rules (IF001-...)
         (InformationFlow, "001") => (RuleGroup::Stable, rules::information_flow::rules::IFMustIncludeVariableLabel),
+        (InformationFlow, "002") => (RuleGroup::Stable, rules::information_flow::rules::IFMissingPrincipal),
 
         // Information flow explicit rules (IF101-...)
         (InformationFlow, "101") => (RuleGroup::Stable, rules::information_flow::rules::IFInconfidentialVariableAssign),

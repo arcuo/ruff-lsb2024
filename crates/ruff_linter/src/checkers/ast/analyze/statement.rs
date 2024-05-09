@@ -1444,7 +1444,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
             }
         }
-        Stmt::Assign(assign @ ast::StmtAssign { targets, value, range, .. }) => {
+        Stmt::Assign(
+            assign @ ast::StmtAssign {
+                targets,
+                value,
+                range,
+                ..
+            },
+        ) => {
             if checker.enabled(Rule::IFInconfidentialVariableAssign) {
                 information_flow::rules::inconfidential_assign_targets_statement(
                     checker,
@@ -1458,6 +1465,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     &assign.targets,
                     range,
                 );
+            }
+
+            if checker.enabled(Rule::IFMissingPrincipal) {
+                information_flow::rules::missing_principal_from_label(checker, assign.range());
             }
 
             if checker.enabled(Rule::SelfOrClsAssignment) {
@@ -1608,7 +1619,15 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
                 if checker.enabled(Rule::IFMustIncludeVariableLabel) {
-                    information_flow::rules::must_include_target_variable_label(checker, &target, range);
+                    information_flow::rules::must_include_target_variable_label(
+                        checker, &target, range,
+                    );
+                }
+                if checker.enabled(Rule::IFMissingPrincipal) {
+                    information_flow::rules::missing_principal_from_label(
+                        checker,
+                        assign_stmt.range(),
+                    );
                 }
             }
             if checker.enabled(Rule::SelfOrClsAssignment) {
