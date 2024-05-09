@@ -193,7 +193,7 @@ impl<'a> Checker<'a> {
             notebook_index,
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
-            information_flow: InformationFlowState::new(&indexer, &locator),
+            information_flow: InformationFlowState::new(indexer, locator),
         }
     }
 }
@@ -1738,22 +1738,6 @@ impl<'a> Checker<'a> {
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind, flags);
 
-        // Add information flow label variable binding
-        // TODO: Add check for is information flow is enabled
-        // TODO: Inherit binding from value
-        // TODO: Are there times when we can skip this?
-        match self.semantic.current_scope().shadowed_binding(binding_id) {
-            Some(_) => {} // Don't add binding for already added bindings
-            None => {
-                self.information_flow.add_variable_label_binding(
-                    binding_id,
-                    range,
-                    self.locator(),
-                    self.indexer().comment_ranges(),
-                );
-            }
-        }
-
         // If the name is private, mark is as such.
         if name.starts_with('_') {
             self.semantic.bindings[binding_id].flags |= BindingFlags::PRIVATE_DECLARATION;
@@ -1803,6 +1787,19 @@ impl<'a> Checker<'a> {
             self.semantic
                 .shadowed_bindings
                 .insert(binding_id, shadowed_id);
+        } else {
+            // No shadowed binding, so this is a new binding.
+            // Add variable label to information flow
+
+            // TODO: Add check for is information flow is enabled
+            // TODO: Inherit binding from value
+            // TODO: Are there times when we can skip this?
+            self.information_flow.add_variable_label_binding(
+                binding_id,
+                range,
+                self.locator(),
+                self.indexer().comment_ranges(),
+            );
         }
 
         // Add the binding to the scope.

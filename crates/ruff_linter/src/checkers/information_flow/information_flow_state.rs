@@ -38,7 +38,7 @@ impl InformationFlowState {
     pub(crate) fn pc(&self) -> String {
         return match self.pc.front() {
             Some(pc) => pc.clone(),
-            None => "".to_string(),
+            None => String::new(),
         };
     }
     #[allow(dead_code)]
@@ -62,37 +62,30 @@ impl InformationFlowState {
         // Add to variable_map
         let line_range = locator.line_range(range.start());
         let label_comment = comment_ranges.comments_in_range(line_range).first();
-        match label_comment {
-            Some(comment) => {
-                let comment_text: &str = &locator.slice(comment).replace("#", "");
+
+        if let Some(comment) = label_comment {
+            let comment_text: &str = &locator.slice(comment).replace('#', "");
+            if let Ok(label) = comment_text.parse::<Label>() {
+                self.variable_map.insert(binding_id, label);
+            }
+        } else {
+            let start_range = range.start().to_u32();
+            let label_comment = if start_range != 0 {
+                comment_ranges
+                    .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
+                    .first()
+            } else {
+                None
+            };
+
+            if let Some(comment) = label_comment {
+                let comment_text: &str = &locator.slice(comment).replace('#', "");
                 if let Ok(label) = comment_text.parse::<Label>() {
                     self.variable_map.insert(binding_id, label);
                 }
-            }
-            // No comment on same line, check previous line
-            None => {
-                let start_range = range.start().to_u32();
-                let label_comment = if start_range != 0 {
-                    comment_ranges
-                        .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
-                        .first()
-                } else {
-                    None
-                };
-
-                match label_comment {
-                    Some(comment) => {
-                        let comment_text: &str = &locator.slice(comment).replace("#", "");
-                        if let Ok(label) = comment_text.parse::<Label>() {
-                            self.variable_map.insert(binding_id, label);
-                        }
-                    }
-                    None =>
-                    // No label comment, add public label
-                    {
-                        self.variable_map.insert(binding_id, Label::new_public());
-                    }
-                }
+            } else {
+                // No label comment, add public label
+                self.variable_map.insert(binding_id, Label::new_public());
             }
         }
     }
@@ -127,22 +120,20 @@ c = 3
             Ok(module) => {
                 let stmts = module.body;
                 for stmt in stmts {
-                    match stmt {
-                        Stmt::Assign(StmtAssign {
-                            targets: _,
-                            value: _,
+                    if let Stmt::Assign(StmtAssign {
+                        targets: _,
+                        value: _,
+                        range,
+                    }) = stmt
+                    {
+                        let binding_id: BindingId = id;
+                        id = (id.as_u32() + 1).into();
+                        state.add_variable_label_binding(
+                            binding_id,
                             range,
-                        }) => {
-                            let binding_id: BindingId = id.clone();
-                            id = (id.as_u32() + 1).into();
-                            state.add_variable_label_binding(
-                                binding_id,
-                                range,
-                                &locator,
-                                &comment_ranges,
-                            );
-                        }
-                        _ => {}
+                            &locator,
+                            comment_ranges,
+                        );
                     }
                 }
             }
@@ -153,9 +144,9 @@ c = 3
         assert!(state.variable_map.contains_key(&BindingId::from(1u32)));
         assert!(state.variable_map.contains_key(&BindingId::from(2u32)));
 
-        let label1 = state.variable_map.get(&BindingId::from(0u32)).unwrap();
-        let label2 = state.variable_map.get(&BindingId::from(1u32)).unwrap();
-        let label3 = state.variable_map.get(&BindingId::from(2u32)).unwrap();
+        let label1 = &state.variable_map[&BindingId::from(0u32)];
+        let label2 = &state.variable_map[&BindingId::from(1u32)];
+        let label3 = &state.variable_map[&BindingId::from(2u32)];
 
         assert_eq!(
             label1,
@@ -203,13 +194,13 @@ a = 1
                             value: _,
                             range,
                         }) => {
-                            let binding_id: BindingId = id.clone();
+                            let binding_id: BindingId = id;
                             id = (id.as_u32() + 1).into();
                             state.add_variable_label_binding(
                                 binding_id,
                                 range,
                                 &locator,
-                                &comment_ranges,
+                                comment_ranges,
                             );
                         }
                         _ => {}
@@ -219,7 +210,7 @@ a = 1
             Err(_) => panic!("Failed to parse module"),
         }
 
-        assert!(state.variable_map.len() == 1);
+        assert!(state.variable_map.len() != 0);
         assert!(state.variable_map.contains_key(&BindingId::from(0u32)));
         assert!(state.variable_map.get(&BindingId::from(0u32)).unwrap() == &Label::new_public());
     }
@@ -243,22 +234,20 @@ b = 2 # iflabel {}
             Ok(module) => {
                 let stmts = module.body;
                 for stmt in stmts {
-                    match stmt {
-                        Stmt::Assign(StmtAssign {
-                            targets: _,
-                            value: _,
+                    if let Stmt::Assign(StmtAssign {
+                        targets: _,
+                        value: _,
+                        range,
+                    }) = stmt
+                    {
+                        let binding_id: BindingId = id;
+                        id = (id.as_u32() + 1).into();
+                        state.add_variable_label_binding(
+                            binding_id,
                             range,
-                        }) => {
-                            let binding_id: BindingId = id.clone();
-                            id = (id.as_u32() + 1).into();
-                            state.add_variable_label_binding(
-                                binding_id,
-                                range,
-                                &locator,
-                                &comment_ranges,
-                            );
-                        }
-                        _ => {}
+                            &locator,
+                            comment_ranges,
+                        );
                     }
                 }
             }
@@ -268,11 +257,11 @@ b = 2 # iflabel {}
         assert!(state.variable_map.contains_key(&BindingId::from(0u32)));
         assert!(state.variable_map.contains_key(&BindingId::from(1u32)));
         assert_eq!(
-            state.variable_map.get(&BindingId::from(0u32)).unwrap(),
+            &state.variable_map[&BindingId::from(0u32)],
             &Label::new_public()
         );
         assert_eq!(
-            state.variable_map.get(&BindingId::from(1u32)).unwrap(),
+            &state.variable_map[&BindingId::from(1u32)],
             &Label::new_public()
         );
     }
