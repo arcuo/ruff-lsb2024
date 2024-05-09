@@ -107,10 +107,42 @@ pub(crate) fn missing_principal_from_label(checker: &mut Checker, assign_range: 
                         global_principals: global_principals.clone(),
                     },
                     principal_range,
-                );
+                )
+                .with_fix(add_principle(checker, principal));
 
                 checker.diagnostics.push(diagnostic);
             };
         }
     }
+}
+
+// IF002 fix add missing principal
+fn add_principle(checker: &mut Checker, missing_principal: &String) -> Fix {
+    let Some(global_principals_range) = checker.information_flow().principals().range else {
+        // Add principals to the top of the file
+        return Fix::unsafe_edit(Edit::insertion(
+            format!("# ifprincipals {{{}}}\n", missing_principal),
+            checker.locator().contents_start(),
+        ));
+    };
+
+    // Add principal to the existing principals list
+    let Ok(mut current_principals) = checker
+        .locator()
+        .slice(global_principals_range)
+        .parse::<Principals>()
+    else {
+        return Fix::unsafe_edit(Edit::insertion(
+            format!("# ifprincipals {{{}}}\n", missing_principal),
+            checker.locator().contents_start(),
+        ));
+    };
+
+    current_principals
+        .add_principle(missing_principal);
+
+    Fix::unsafe_edit(Edit::range_replacement(
+        format!("# {}", current_principals.to_string()),
+        global_principals_range,
+    ))
 }

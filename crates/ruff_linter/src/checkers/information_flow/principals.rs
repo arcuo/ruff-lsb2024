@@ -51,6 +51,19 @@ impl Principals {
     pub(crate) fn concat(&mut self, other: &Principals) {
         self.principals.extend(other.principals.clone());
     }
+
+    pub(crate) fn add_principle(&mut self, principal: &String) {
+        self.principals.push(principal.clone());
+    }
+}
+
+impl ToString for Principals {
+    fn to_string(&self) -> String {
+        format!(
+            "ifprincipals {{ {} }}",
+            self.principals.iter().map(|s| s.to_string()).collect::<Vec<String>>().join(", ")
+        )
+    }
 }
 
 impl FromStr for Principals {
@@ -101,8 +114,8 @@ pub(super) fn initiate_principals(indexer: &Indexer, locator: &Locator) -> Princ
     // TODO: Implement logic to extract principals from block comments with comment_ranges.block_comments()
     for comment_range in indexer.comment_ranges() {
         let comment = locator.slice(comment_range).replace('#', "");
-        if let Ok(mut _principals) = comment.parse::<Principals>() {
-            _principals.range = Some(comment_range.clone());
+        if let Ok(_principals) = comment.parse::<Principals>() {
+            principals.range = Some(comment_range.clone());
             principals.concat(&_principals);
         }
     }
