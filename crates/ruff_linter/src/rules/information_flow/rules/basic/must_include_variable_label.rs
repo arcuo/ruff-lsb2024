@@ -45,7 +45,10 @@ impl Violation for IFMustIncludeVariableLabel {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Add explicit public label to the variable `{}`", self.var))
+        Some(format!(
+            "Add explicit public label to the variable `{}`",
+            self.var
+        ))
     }
 }
 

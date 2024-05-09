@@ -138,8 +138,7 @@ fn add_principle(checker: &mut Checker, missing_principal: &String) -> Fix {
         ));
     };
 
-    current_principals
-        .add_principle(missing_principal);
+    current_principals.add_principle(missing_principal);
 
     Fix::unsafe_edit(Edit::range_replacement(
         format!("# {}", current_principals.to_string()),

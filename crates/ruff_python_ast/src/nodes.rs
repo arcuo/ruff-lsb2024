@@ -667,7 +667,7 @@ impl Expr {
             | Expr::BytesLiteral(ExprBytesLiteral { range, .. })
             | Expr::BooleanLiteral(ExprBooleanLiteral { range, .. })
             | Expr::NoneLiteral(ExprNoneLiteral { range, .. })
-            | Expr::EllipsisLiteral(ExprEllipsisLiteral { range, .. })
+            | Expr::EllipsisLiteral(ExprEllipsisLiteral { range })
             | Expr::Subscript(ExprSubscript { range, .. })
             | Expr::Starred(ExprStarred { range, .. })
             | Expr::Tuple(ExprTuple { range, .. })

@@ -183,8 +183,13 @@ x = 1
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
         let principals = initiate_principals(&indexer, &locator);
-        assert_eq!(principals, Principals::new_from_str_with_range(vec!["alice", "bob"], 
-        TextRange::new(TextSize::new(21), TextSize::new(50))));
+        assert_eq!(
+            principals,
+            Principals::new_from_str_with_range(
+                vec!["alice", "bob"],
+                TextRange::new(TextSize::new(21), TextSize::new(50))
+            )
+        );
     }
 
     #[test]
@@ -221,8 +226,10 @@ x = 1
         let principals = initiate_principals(&indexer, &locator);
         assert_eq!(
             principals,
-            Principals::new_from_str_with_range(vec!["alice", "bob", "charlie", "dean"],
-            TextRange::new(TextSize::new(31), TextSize::new(63)))
+            Principals::new_from_str_with_range(
+                vec!["alice", "bob", "charlie", "dean"],
+                TextRange::new(TextSize::new(31), TextSize::new(63))
+            )
         );
     }
 }
