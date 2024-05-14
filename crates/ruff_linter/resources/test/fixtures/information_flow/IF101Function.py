@@ -7,7 +7,7 @@ def help(a,b):
   return secret # OK but not if return was "public"
 
 secret = 1 # iflabel {secret}
-public = 2 # iflabel {secret}
+public = 2 # iflabel {public}
 
 # # Checking args
 # help(secret, public) # OK
@@ -15,4 +15,4 @@ public = 2 # iflabel {secret}
 
 # Checking return
 # secret = help(secret, public) # OK
-public = help(secret, public) # Fail public cannot be assigned a secret return value from help
+public = help(secret, public) # Fail public cannot be assigned a secret return value from foo

@@ -72,6 +72,7 @@ pub(crate) struct FunctionLabel {
     pub(crate) return_label: Label,
 }
 impl FunctionLabel {
+    #[allow(dead_code)]
     pub(crate) fn to_string(&self) -> String {
         let argument_labels = self
             .argument_labels
@@ -80,7 +81,7 @@ impl FunctionLabel {
             .collect::<Vec<String>>()
             .join(", ");
 
-        format!("{{ {} }}", argument_labels)
+        format!("{{ {} }} {{{}}}", argument_labels, self.return_label.to_string())
     }
 }
 #[derive(Debug, Clone)]

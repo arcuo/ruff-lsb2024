@@ -80,6 +80,16 @@ impl InformationFlowState {
         }
     }
 
+    fn get_previous_line(locator: &Locator, range: TextRange) -> Option<TextRange> {
+        let current_line = locator.line_range(range.start());
+        if (current_line.start().to_u32()) == 0 {
+            return None;
+        }
+
+        let previous_line = locator.line_range(TextSize::from(current_line.start().to_u32() - 1));
+        Some(previous_line)
+    }
+
     pub(crate) fn add_variable_label_binding(
         &mut self,
         binding_id: BindingId,
@@ -104,14 +114,14 @@ impl InformationFlowState {
                         self.variable_map.insert(binding_id, label);
                     }
                 } else {
-                    let start_range = range.start().to_u32();
-                    let label_comment = if start_range != 0 {
-                        comment_ranges
-                            .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
-                            .first()
-                    } else {
-                        None
-                    };
+                    let label_comment =
+                        if let Some(previous_line) = Self::get_previous_line(locator, range) {
+                            comment_ranges
+                                .comments_in_range(previous_line) // Previous line
+                                .first()
+                        } else {
+                            None
+                        };
 
                     if let Some(comment) = label_comment {
                         let comment_text: &str = &locator.slice(comment).replace('#', "");
@@ -125,14 +135,14 @@ impl InformationFlowState {
                 }
             }
             BindingKind::FunctionDefinition(_) => {
-                let start_range = range.start().to_u32();
-                let label_comment = if start_range != 0 {
-                    comment_ranges
-                        .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
-                        .first()
-                } else {
-                    None
-                };
+                let label_comment =
+                    if let Some(previous_line) = Self::get_previous_line(locator, range) {
+                        comment_ranges
+                            .comments_in_range(previous_line) // Previous line
+                            .first()
+                    } else {
+                        None
+                    };
 
                 if let Some(comment) = label_comment {
                     let comment_text: &str = &locator.slice(comment).replace('#', "");
@@ -151,7 +161,6 @@ impl InformationFlowState {
                     // No return label comment, add public label
                     self.variable_map.insert(binding_id, Label::new_public());
                 }
-                println!("{:?}", self.variable_map());
             }
             BindingKind::Argument => {
                 // Find the label from the function parameter map and then insert it into the
@@ -410,16 +419,7 @@ public = help(secret, public) # Fail public cannot be assigned a secret return v
                 let stmts = module.body;
                 for stmt in stmts {
                     match stmt {
-                        Stmt::FunctionDef(StmtFunctionDef {
-                            range,
-                            is_async,
-                            decorator_list,
-                            name,
-                            type_params,
-                            parameters,
-                            returns,
-                            body,
-                        }) => {
+                        Stmt::FunctionDef(StmtFunctionDef { range, name, .. }) => {
                             let binding_id: BindingId = id;
                             id = (id.as_u32() + 1).into();
                             state.add_variable_label_binding(

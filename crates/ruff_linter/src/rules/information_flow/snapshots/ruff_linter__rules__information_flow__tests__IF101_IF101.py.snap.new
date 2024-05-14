@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
-assertion_line: 23
+assertion_line: 24
 ---
 IF101.py:18:11: IF101 Inconfidential assignment to more restrictive variable. Expression `bob_var` with label `{ bob }` is being assigned to `bob_var = alice_bob_var
 ` with label `{ alice, bob }`
