@@ -616,7 +616,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 for parameter in &**parameters {
                     if let Some(expr) = parameter.annotation() {
-                        self.information_flow.test_function(&parameter);
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
                             singledispatch = false;
@@ -672,12 +671,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope(); // Function scope
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
-                self.add_binding(
+                let binding_id = self.add_binding(
                     name,
                     stmt.identifier(),
                     BindingKind::FunctionDefinition(scope_id),
                     BindingFlags::empty(),
                 );
+                // Run through all the parameters and add their name to the function_parameter_map
+                for (parameter_index, parameter) in (&**parameters).into_iter().enumerate() {
+                    let name = parameter.name();
+
+                    self.information_flow
+                        .add_parameter_name(binding_id, name, parameter_index);
+                }
             }
             Stmt::ClassDef(
                 class_def @ ast::StmtClassDef {
@@ -1446,7 +1452,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
+        for (i, parameter) in parameters
+            .iter()
+            .map(AnyParameterRef::as_parameter)
+            .enumerate()
+        {
             self.visit_parameter(parameter);
         }
 
@@ -1737,7 +1747,7 @@ impl<'a> Checker<'a> {
         };
 
         // Create the `Binding`.
-        let binding_id = self.semantic.push_binding(range, kind, flags);
+        let binding_id = self.semantic.push_binding(range, kind.clone(), flags);
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {
@@ -1800,6 +1810,8 @@ impl<'a> Checker<'a> {
                 range,
                 self.locator(),
                 self.indexer().comment_ranges(),
+                &kind,
+                name,
             );
         }
 

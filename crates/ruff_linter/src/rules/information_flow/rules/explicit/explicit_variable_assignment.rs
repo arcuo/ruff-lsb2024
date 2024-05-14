@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCompare, ExprDict, ExprIf, ExprList,
-    ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
+    Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
+    ExprList, ExprName, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
 
 use crate::checkers::{ast::Checker, information_flow::label::Label};
@@ -208,7 +208,10 @@ fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Option<Label>
         Expr::Generator(_) => todo!(),
 
         // Functions
-        Expr::Call(_) => None,   // TODO: Handle call expressions
+        Expr::Call(ExprCall { func, .. }) => {
+            let func_label = get_label_for_expression(checker, func);
+            func_label
+        } // TODO: Handle call expressions
         Expr::Lambda(_) => None, // TODO: Handle lambda expressions
         Expr::Await(ExprAwait { value, .. }) => get_label_for_expression(checker, value), // Will go to the function expressions
 
