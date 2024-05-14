@@ -1,10 +1,13 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::str::FromStr;
+use std::{collections::hash_map, str::FromStr};
 
 lazy_static! {
     static ref LABEL_REGEX: Regex =
-        Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
+        Regex::new(r"(iflabel)?\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
+    static ref FUNCTION_LABEL_REGEX: Regex =
+        Regex::new(r"iflabel\s*fn\s*\(\s*(?P<arg>[\{\w\s,\}]+)?\s*\)\s*(?P<return>[\{\w\s,\}]+)?")
+            .unwrap();
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]
@@ -35,8 +38,8 @@ impl Label {
     }
 
     /// Check labels direction convertion i.e. you can move down in the lattice, not up
-    /// 
-    ///       AB 
+    ///
+    ///       AB
     ///      / \
     ///     A   B
     ///      \ /
@@ -60,6 +63,24 @@ impl Label {
 
         // If the labels have the same principals, then you can "convert" between them
         label.principals == self.principals
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Default, Eq)]
+pub(crate) struct FunctionLabel {
+    pub(crate) argument_labels: Vec<Label>,
+    pub(crate) return_label: Label,
+}
+impl FunctionLabel {
+    pub(crate) fn to_string(&self) -> String {
+        let argument_labels = self
+            .argument_labels
+            .iter()
+            .map(|label| label.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        format!("{{ {} }}", argument_labels)
     }
 }
 #[derive(Debug, Clone)]
@@ -88,6 +109,36 @@ impl FromStr for Label {
                 }
                 None => Ok(Label::new_public()),
             },
+            None => Err(LabelParseError),
+        }
+    }
+}
+
+impl FromStr for FunctionLabel {
+    type Err = LabelParseError;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        match FUNCTION_LABEL_REGEX.captures(string) {
+            Some(captures) => {
+                let argument_labels = match captures.name("arg") {
+                    Some(label) => label
+                        .as_str()
+                        .split(',')
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.parse::<Label>().unwrap())
+                        .collect::<Vec<Label>>(),
+                    None => vec![],
+                };
+                let return_label = match captures.name("return") {
+                    Some(label) => label.as_str().parse::<Label>().unwrap(),
+                    None => Label::new_public(),
+                };
+                Ok(FunctionLabel {
+                    argument_labels,
+                    return_label,
+                })
+            }
             None => Err(LabelParseError),
         }
     }
