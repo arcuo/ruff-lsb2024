@@ -1,4 +1,4 @@
-# iflabel fn ({secret}, {public}) {secret}
+# iflabel fn ({Alice}, {Bob}) {Bob}
 def help(a,b):
   # Checking internal run of the function using arg labels
   some_outer_secret_value = a # OK
@@ -6,8 +6,8 @@ def help(a,b):
   return public # OK
   return secret # OK but not if return was "public"
 
-secret = 1 # iflabel {secret}
-public = 2 # iflabel {secret}
+secret = 1 # iflabel {Alice}
+public = 2 # iflabel {}
 
 # # Checking args
 # help(secret, public) # OK
