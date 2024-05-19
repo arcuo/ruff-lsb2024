@@ -78,7 +78,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateUnionMember,
                 Rule::RedundantLiteralUnion,
                 Rule::UnnecessaryTypeUnion,
-                Rule::NeverUnion,
             ]) {
                 // Avoid duplicate checks if the parent is a union, since these rules already
                 // traverse nested unions.
@@ -95,6 +94,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::UnnecessaryTypeUnion) {
                         flake8_pyi::rules::unnecessary_type_union(checker, expr);
                     }
+                }
+            }
+
+            // Ex) Literal[...]
+            if checker.enabled(Rule::DuplicateLiteralMember) {
+                if !checker.semantic.in_nested_literal() {
+                    flake8_pyi::rules::duplicate_literal_member(checker, expr);
                 }
             }
 

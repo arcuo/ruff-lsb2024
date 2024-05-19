@@ -808,6 +808,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "055") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnnecessaryTypeUnion),
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
         (Flake8Pyi, "058") => (RuleGroup::Stable, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
+        (Flake8Pyi, "059") => (RuleGroup::Preview, rules::flake8_pyi::rules::GenericNotLastBaseClass),
+        (Flake8Pyi, "062") => (RuleGroup::Preview, rules::flake8_pyi::rules::DuplicateLiteralMember),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),
@@ -1086,12 +1088,14 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "009") => (RuleGroup::Stable, rules::flake8_logging::rules::UndocumentedWarn),
 
 
-        // Information flow basic rules (001-...)
+        // Information flow basic rules (IF001-...)
+        (InformationFlow, "001") => (RuleGroup::Stable, rules::information_flow::rules::IFMustIncludeVariableLabel),
+        (InformationFlow, "002") => (RuleGroup::Stable, rules::information_flow::rules::IFMissingPrincipal),
 
-        // Information flow explicit rules (101-...)
+        // Information flow explicit rules (IF101-...)
         (InformationFlow, "101") => (RuleGroup::Stable, rules::information_flow::rules::IFInconfidentialVariableAssign),
 
-        // Information flow implicit rules (201-...)
+        // Information flow implicit rules (IF201-...)
 
         _ => return None,
     })

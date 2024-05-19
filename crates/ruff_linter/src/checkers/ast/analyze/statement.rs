@@ -204,7 +204,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::CachedInstanceMethod) {
-                flake8_bugbear::rules::cached_instance_method(checker, decorator_list);
+                flake8_bugbear::rules::cached_instance_method(checker, function_def);
             }
             if checker.enabled(Rule::MutableArgumentDefault) {
                 flake8_bugbear::rules::mutable_argument_default(checker, function_def);
@@ -478,6 +478,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::EllipsisInNonEmptyClassBody) {
                 flake8_pyi::rules::ellipsis_in_non_empty_class_body(checker, body);
+            }
+            if checker.enabled(Rule::GenericNotLastBaseClass) {
+                flake8_pyi::rules::generic_not_last_base_class(checker, class_def);
             }
             if checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle) {
                 flake8_pytest_style::rules::marks(checker, decorator_list);
@@ -878,7 +881,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         if !matches!(checker.semantic.current_scope().kind, ScopeKind::Module) {
                             checker.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
-                                    name: helpers::format_import_from(level, module),
+                                    name: helpers::format_import_from(level, module).to_string(),
                                 },
                                 stmt.range(),
                             ));
@@ -887,7 +890,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     if checker.enabled(Rule::UndefinedLocalWithImportStar) {
                         checker.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::UndefinedLocalWithImportStar {
-                                name: helpers::format_import_from(level, module),
+                                name: helpers::format_import_from(level, module).to_string(),
                             },
                             stmt.range(),
                         ));
@@ -1078,7 +1081,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::misplaced_bare_raise(checker, raise);
             }
         }
-        Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
+        Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, value, .. }) => {
+            if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+                information_flow::rules::inconfidential_assign_target_statement(
+                    checker, &target, &value,
+                );
+            }
             if checker.enabled(Rule::SelfOrClsAssignment) {
                 pylint::rules::self_or_cls_assignment(checker, target);
             }
@@ -1324,10 +1332,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::dict_iter_missing_items(checker, target, iter);
             }
             if checker.enabled(Rule::ManualListComprehension) {
-                perflint::rules::manual_list_comprehension(checker, target, body);
+                perflint::rules::manual_list_comprehension(checker, for_stmt);
             }
             if checker.enabled(Rule::ManualListCopy) {
-                perflint::rules::manual_list_copy(checker, target, body);
+                perflint::rules::manual_list_copy(checker, for_stmt);
             }
             if checker.enabled(Rule::ManualDictComprehension) {
                 perflint::rules::manual_dict_comprehension(checker, target, body);
@@ -1436,14 +1444,33 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
             }
         }
-        Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+        Stmt::Assign(
+            assign @ ast::StmtAssign {
+                targets,
+                value,
+                range,
+                ..
+            },
+        ) => {
             if checker.enabled(Rule::IFInconfidentialVariableAssign) {
-                information_flow::rules::inconfidential_assign_statement(
+                information_flow::rules::inconfidential_assign_targets_statement(
                     checker,
                     &assign.targets,
                     &assign.value,
                 );
             }
+            if checker.enabled(Rule::IFMustIncludeVariableLabel) {
+                information_flow::rules::must_include_targets_variable_label(
+                    checker,
+                    &assign.targets,
+                    range,
+                );
+            }
+
+            if checker.enabled(Rule::IFMissingPrincipal) {
+                information_flow::rules::missing_principal_from_label(checker, assign.range());
+            }
+
             if checker.enabled(Rule::SelfOrClsAssignment) {
                 for target in targets {
                     pylint::rules::self_or_cls_assignment(checker, target);
@@ -1572,6 +1599,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 target,
                 value,
                 annotation,
+                range,
                 ..
             },
         ) => {
@@ -1583,6 +1611,22 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         value,
                         Some(annotation),
                         stmt,
+                    );
+                }
+                if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+                    information_flow::rules::inconfidential_assign_target_statement(
+                        checker, &target, value,
+                    );
+                }
+                if checker.enabled(Rule::IFMustIncludeVariableLabel) {
+                    information_flow::rules::must_include_target_variable_label(
+                        checker, &target, range,
+                    );
+                }
+                if checker.enabled(Rule::IFMissingPrincipal) {
+                    information_flow::rules::missing_principal_from_label(
+                        checker,
+                        assign_stmt.range(),
                     );
                 }
             }

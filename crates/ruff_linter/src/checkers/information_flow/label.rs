@@ -37,7 +37,7 @@ impl Label {
         format!("{{ {} }}", principals)
     }
 
-    /// Check labels direction convertion i.e. you can move down in the lattice, not up
+    /// Check labels direction conversion i.e. you can move down in the lattice, not up
     ///
     ///       AB
     ///      / \

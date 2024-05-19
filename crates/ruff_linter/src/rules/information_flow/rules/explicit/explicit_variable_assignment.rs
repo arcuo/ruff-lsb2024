@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
-    ExprList, ExprName, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
+    Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCompare, ExprDict, ExprIf, ExprList,
+    ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
 
 use crate::checkers::{ast::Checker, information_flow::label::Label};
@@ -13,8 +13,8 @@ use super::helpers::get_variable_label_by_name;
 /// Check confidentiality of information flow in variable assignments.
 ///
 /// ## Why is this bad?
-/// Public variables or variables with labels that are cannot flow in the information flow lattice
-/// to the value being assigned to them, are not trusted to hold the sensitive information by their definition.
+/// Public variables or variables with labels that are lower in the information flow lattice cannot flow up in the lattice
+/// to the value being assigned to them. Due to the fact that they are not trusted to hold the sensitive information by their definition.
 /// ...
 ///
 /// ## Example
@@ -44,16 +44,37 @@ impl Violation for IFInconfidentialVariableAssign {
 
 // TODO
 /// IF101
-pub(crate) fn inconfidential_assign_statement(
+pub(crate) fn inconfidential_assign_targets_statement(
     checker: &mut Checker,
     targets: &Vec<Expr>,
     value: &Expr,
 ) {
-    if let Some(result) = is_inconfidential_assign_statement(checker, targets, value) {
-        // Add diagnostics
-        checker
-            .diagnostics
-            .push(Diagnostic::new(result, value.range()));
+    for target in targets {
+        inconfidential_assign_target_statement(checker, target, value);
+    }
+}
+
+/// IF101
+pub(crate) fn inconfidential_assign_target_statement(
+    checker: &mut Checker,
+    target: &Expr,
+    value: &Expr,
+) {
+    match target {
+        Expr::Tuple(ExprTuple { elts, .. }) => {
+            for element in elts {
+                inconfidential_assign_target_statement(checker, element, value);
+            }
+        }
+        Expr::Name(_) => {
+            if let Some(result) = is_inconfidential_assign_statement(checker, target, value) {
+                // Add diagnostics
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(result, target.range()));
+            }
+        }
+        _ => {}
     }
 }
 
@@ -61,16 +82,24 @@ fn get_most_restrictive_label_from_list_of_expressions(
     checker: &mut Checker,
     expressions: &Vec<Expr>,
 ) -> Option<Label> {
-    let mut label = None;
+    let mut curr_label: Option<Label> = None;
     for expr in expressions {
         if let Some(expr_label) = get_label_for_expression(checker, &expr) {
-            if expr_label.is_higher_in_lattice_path(label.as_ref().unwrap()) {
-                label = Some(expr_label);
+            if let Some(label) = curr_label.clone() {
+                if expr_label.is_higher_in_lattice_path(&label) {
+                    curr_label = Some(expr_label);
+                }
+            } else {
+                curr_label = Some(expr_label);
             }
         }
     }
 
-    label
+    if let Some(curr_label) = curr_label.clone() {
+        return Some(curr_label.clone());
+    }
+
+    None
 }
 
 fn get_higher_of_two_labels(label1: Option<Label>, label2: Option<Label>) -> Option<Label> {
@@ -139,8 +168,15 @@ fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Option<Label>
         Expr::BoolOp(ExprBoolOp { values, .. })
         | Expr::Tuple(ExprTuple { elts: values, .. })
         | Expr::List(ExprList { elts: values, .. })
-        | Expr::Dict(ExprDict { values, .. })
         | Expr::Set(ExprSet { elts: values, .. }) => {
+            get_most_restrictive_label_from_list_of_expressions(checker, values)
+        }
+
+        Expr::Dict(ExprDict { items, .. }) => {
+            let values: &Vec<Expr> = &items
+                .iter()
+                .map(|item| item.value.clone())
+                .collect::<Vec<_>>();
             get_most_restrictive_label_from_list_of_expressions(checker, values)
         }
 
@@ -176,10 +212,7 @@ fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Option<Label>
         Expr::Generator(_) => todo!(),
 
         // Functions
-        Expr::Call(ExprCall { func, .. }) => {
-            let func_label = get_label_for_expression(checker, func);
-            func_label
-        } // TODO: Handle call expressions
+        Expr::Call(_) => None,   // TODO: Handle call expressions
         Expr::Lambda(_) => None, // TODO: Handle lambda expressions
         Expr::Await(ExprAwait { value, .. }) => get_label_for_expression(checker, value), // Will go to the function expressions
 
@@ -204,11 +237,11 @@ fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Option<Label>
 /// I.e. the variable label is more restrictive than the value label or the same.
 fn is_inconfidential_assign_statement(
     checker: &mut Checker,
-    targets: &[Expr],
+    target: &Expr,
     value: &Expr,
 ) -> Option<IFInconfidentialVariableAssign> {
     // Get variable and value names
-    let Some(Expr::Name(variable_name)) = targets.first() else {
+    let Expr::Name(variable_name) = target else {
         return None;
     };
 
