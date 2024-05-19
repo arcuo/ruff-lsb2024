@@ -1452,7 +1452,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for (i, parameter) in parameters
+        for (_i, parameter) in parameters
             .iter()
             .map(AnyParameterRef::as_parameter)
             .enumerate()
@@ -1749,6 +1749,15 @@ impl<'a> Checker<'a> {
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind.clone(), flags);
 
+        self.information_flow.add_variable_label_binding(
+            binding_id,
+            range,
+            self.locator(),
+            self.indexer().comment_ranges(),
+            &kind,
+            name,
+        );
+
         // If the name is private, mark is as such.
         if name.starts_with('_') {
             self.semantic.bindings[binding_id].flags |= BindingFlags::PRIVATE_DECLARATION;
@@ -1798,21 +1807,6 @@ impl<'a> Checker<'a> {
             self.semantic
                 .shadowed_bindings
                 .insert(binding_id, shadowed_id);
-        } else {
-            // No shadowed binding, so this is a new binding.
-            // Add variable label to information flow
-
-            // TODO: Add check for is information flow is enabled
-            // TODO: Inherit binding from value
-            // TODO: Are there times when we can skip this?
-            self.information_flow.add_variable_label_binding(
-                binding_id,
-                range,
-                self.locator(),
-                self.indexer().comment_ranges(),
-                &kind,
-                name,
-            );
         }
 
         // Add the binding to the scope.

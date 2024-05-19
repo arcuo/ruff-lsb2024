@@ -11,7 +11,7 @@ pub(super) fn get_variable_label_by_name(checker: &mut Checker, name: &ExprName)
             .semantic()
             .current_scope()
             .shadowed_bindings(binding_id)
-            .last()
+            .last() // TODO: For the shadowed functions from modules, we should not get the last one
         {
             // Get [Label] from information_flow
             if let Some(label) = checker.information_flow().get_label(actual_binding_id) {
