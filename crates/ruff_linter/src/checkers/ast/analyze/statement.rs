@@ -1444,7 +1444,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
             }
         }
-        Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+        Stmt::Assign(
+            assign @ ast::StmtAssign {
+                targets,
+                value,
+                range,
+                ..
+            },
+        ) => {
             if checker.enabled(Rule::IFInconfidentialVariableAssign) {
                 information_flow::rules::inconfidential_assign_targets_statement(
                     checker,
@@ -1452,6 +1459,18 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     &assign.value,
                 );
             }
+            if checker.enabled(Rule::IFMustIncludeVariableLabel) {
+                information_flow::rules::must_include_targets_variable_label(
+                    checker,
+                    &assign.targets,
+                    range,
+                );
+            }
+
+            if checker.enabled(Rule::IFMissingPrincipal) {
+                information_flow::rules::missing_principal_from_label(checker, assign.range());
+            }
+
             if checker.enabled(Rule::SelfOrClsAssignment) {
                 for target in targets {
                     pylint::rules::self_or_cls_assignment(checker, target);
@@ -1580,6 +1599,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 target,
                 value,
                 annotation,
+                range,
                 ..
             },
         ) => {
@@ -1596,6 +1616,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::IFInconfidentialVariableAssign) {
                     information_flow::rules::inconfidential_assign_target_statement(
                         checker, &target, value,
+                    );
+                }
+                if checker.enabled(Rule::IFMustIncludeVariableLabel) {
+                    information_flow::rules::must_include_target_variable_label(
+                        checker, &target, range,
+                    );
+                }
+                if checker.enabled(Rule::IFMissingPrincipal) {
+                    information_flow::rules::missing_principal_from_label(
+                        checker,
+                        assign_stmt.range(),
                     );
                 }
             }

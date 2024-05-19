@@ -2,6 +2,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 use std::str::FromStr;
 
 lazy_static! {
@@ -9,30 +10,71 @@ lazy_static! {
         Regex::new(r"ifprincipals\s*\{\s*(?P<principals>[\w\s,]+)\s*\}").unwrap();
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub(crate) struct Principals {
     pub(crate) principals: Vec<String>,
+    pub(crate) range: Option<TextRange>,
 }
 
 impl Principals {
     #[allow(dead_code)]
-    pub(crate) fn new(principals: Vec<String>) -> Self {
-        Self { principals }
+    pub(self) fn new(principals: Vec<String>) -> Self {
+        Self {
+            principals,
+            range: None,
+        }
     }
 
     #[allow(dead_code)]
-    pub(crate) fn new_from_str(principals: Vec<&str>) -> Self {
+    pub(self) fn new_with_range(principals: Vec<String>, range: TextRange) -> Self {
+        Self {
+            principals,
+            range: Some(range),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(self) fn new_from_str(principals: Vec<&str>) -> Self {
         Self {
             principals: principals.iter().map(|s| (*s).to_string()).collect(),
+            range: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(self) fn new_from_str_with_range(principals: Vec<&str>, range: TextRange) -> Self {
+        Self {
+            principals: principals.iter().map(|s| (*s).to_string()).collect(),
+            range: Some(range),
         }
     }
 
     pub(crate) fn new_empty() -> Self {
-        Self { principals: vec![] }
+        Self {
+            principals: vec![],
+            range: None,
+        }
     }
 
     pub(crate) fn concat(&mut self, other: &Principals) {
         self.principals.extend(other.principals.clone());
+    }
+
+    pub(crate) fn add_principle(&mut self, principal: &String) {
+        self.principals.push(principal.clone());
+    }
+}
+
+impl ToString for Principals {
+    fn to_string(&self) -> String {
+        format!(
+            "ifprincipals {{ {} }}",
+            self.principals
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
     }
 }
 
@@ -58,7 +100,10 @@ impl FromStr for Principals {
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
                     .collect::<Vec<String>>();
-                Ok(Principals { principals })
+                Ok(Principals {
+                    principals,
+                    range: None,
+                })
             }
             None => Err(()),
         }
@@ -82,9 +127,10 @@ fn test_parse_principals() {
 pub(super) fn initiate_principals(indexer: &Indexer, locator: &Locator) -> Principals {
     let mut principals = Principals::new_empty();
     // TODO: Implement logic to extract principals from block comments with comment_ranges.block_comments()
-    for range in indexer.comment_ranges() {
-        let comment = locator.slice(range).replace('#', "");
+    for comment_range in indexer.comment_ranges() {
+        let comment = locator.slice(comment_range).replace('#', "");
         if let Ok(_principals) = comment.parse::<Principals>() {
+            principals.range = Some(comment_range.clone());
             principals.concat(&_principals);
         }
     }
@@ -94,6 +140,8 @@ pub(super) fn initiate_principals(indexer: &Indexer, locator: &Locator) -> Princ
 
 #[cfg(test)]
 mod initiate_principals_tests {
+    use ruff_text_size::TextSize;
+
     use super::*;
 
     #[test]
@@ -111,7 +159,13 @@ x = 1
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
         let principals = initiate_principals(&indexer, &locator);
-        assert_eq!(principals, Principals::new_from_str(vec!["alice", "bob"]));
+        assert_eq!(
+            principals,
+            Principals::new_from_str_with_range(
+                vec!["alice", "bob"],
+                TextRange::new(TextSize::new(1), TextSize::new(30))
+            )
+        );
     }
 
     #[test]
@@ -129,7 +183,13 @@ x = 1
         let locator = Locator::new(source);
         let indexer = Indexer::from_tokens(&tokens, &locator);
         let principals = initiate_principals(&indexer, &locator);
-        assert_eq!(principals, Principals::new_from_str(vec!["alice", "bob"]));
+        assert_eq!(
+            principals,
+            Principals::new_from_str_with_range(
+                vec!["alice", "bob"],
+                TextRange::new(TextSize::new(21), TextSize::new(50))
+            )
+        );
     }
 
     #[test]
@@ -166,7 +226,10 @@ x = 1
         let principals = initiate_principals(&indexer, &locator);
         assert_eq!(
             principals,
-            Principals::new_from_str(vec!["alice", "bob", "charlie", "dean"])
+            Principals::new_from_str_with_range(
+                vec!["alice", "bob", "charlie", "dean"],
+                TextRange::new(TextSize::new(31), TextSize::new(63))
+            )
         );
     }
 }

@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_python_ast::{Expr, ExprBooleanLiteral, ExprCall};
+
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;

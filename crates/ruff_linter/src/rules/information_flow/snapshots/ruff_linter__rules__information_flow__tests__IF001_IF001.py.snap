@@ -1,0 +1,167 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+---
+IF001.py:4:1: IF001 [*] Missing variable label for `b` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel { ... }` or `iflabel {}` for public.
+  |
+2 | ## BAD
+3 | 
+4 | b = 0
+  | ^ IF001
+5 | b2: int = 0
+6 | b3 = b4 = 0
+  |
+  = help: Add explicit public label to the variable `b`
+
+ℹ Safe fix
+1 1 | 
+2 2 | ## BAD
+3 3 | 
+4   |-b = 0
+  4 |+b = 0 # iflabel {}
+5 5 | b2: int = 0
+6 6 | b3 = b4 = 0
+7 7 | b5, b6 = 0, 0
+
+IF001.py:5:1: IF001 [*] Missing variable label for `b2` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel { ... }` or `iflabel {}` for public.
+  |
+4 | b = 0
+5 | b2: int = 0
+  | ^^ IF001
+6 | b3 = b4 = 0
+7 | b5, b6 = 0, 0
+  |
+  = help: Add explicit public label to the variable `b2`
+
+ℹ Safe fix
+2 2 | ## BAD
+3 3 | 
+4 4 | b = 0
+5   |-b2: int = 0
+  5 |+b2: int = 0 # iflabel {}
+6 6 | b3 = b4 = 0
+7 7 | b5, b6 = 0, 0
+8 8 | b7, b8 = 1
+
+IF001.py:6:1: IF001 [*] Missing variable label for `b3` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel { ... }` or `iflabel {}` for public.
+  |
+4 | b = 0
+5 | b2: int = 0
+6 | b3 = b4 = 0
+  | ^^ IF001
+7 | b5, b6 = 0, 0
+8 | b7, b8 = 1
+  |
+  = help: Add explicit public label to the variable `b3`
+
+ℹ Safe fix
+3 3 | 
+4 4 | b = 0
+5 5 | b2: int = 0
+6   |-b3 = b4 = 0
+  6 |+b3 = b4 = 0 # iflabel {}
+7 7 | b5, b6 = 0, 0
+8 8 | b7, b8 = 1
+9 9 | 
+
+IF001.py:6:6: IF001 [*] Missing variable label for `b4` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel { ... }` or `iflabel {}` for public.
+  |
+4 | b = 0
+5 | b2: int = 0
+6 | b3 = b4 = 0
+  |      ^^ IF001
+7 | b5, b6 = 0, 0
+8 | b7, b8 = 1
+  |
+  = help: Add explicit public label to the variable `b4`
+
+ℹ Safe fix
+3 3 | 
+4 4 | b = 0
+5 5 | b2: int = 0
+6   |-b3 = b4 = 0
+  6 |+b3 = b4 = 0 # iflabel {}
+7 7 | b5, b6 = 0, 0
+8 8 | b7, b8 = 1
+9 9 | 
+
+IF001.py:7:1: IF001 [*] Missing variable label for `b5` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel { ... }` or `iflabel {}` for public.
+  |
+5 | b2: int = 0
+6 | b3 = b4 = 0
+7 | b5, b6 = 0, 0
+  | ^^ IF001
+8 | b7, b8 = 1
+  |
+  = help: Add explicit public label to the variable `b5`
+
+ℹ Safe fix
+4 4 | b = 0
+5 5 | b2: int = 0
+6 6 | b3 = b4 = 0
+7   |-b5, b6 = 0, 0
+  7 |+b5, b6 = 0, 0 # iflabel {}
+8 8 | b7, b8 = 1
+9 9 | 
+10 10 | ## GOOD
+
+IF001.py:7:5: IF001 [*] Missing variable label for `b6` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel { ... }` or `iflabel {}` for public.
+  |
+5 | b2: int = 0
+6 | b3 = b4 = 0
+7 | b5, b6 = 0, 0
+  |     ^^ IF001
+8 | b7, b8 = 1
+  |
+  = help: Add explicit public label to the variable `b6`
+
+ℹ Safe fix
+4 4 | b = 0
+5 5 | b2: int = 0
+6 6 | b3 = b4 = 0
+7   |-b5, b6 = 0, 0
+  7 |+b5, b6 = 0, 0 # iflabel {}
+8 8 | b7, b8 = 1
+9 9 | 
+10 10 | ## GOOD
+
+IF001.py:8:1: IF001 [*] Missing variable label for `b7` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel { ... }` or `iflabel {}` for public.
+   |
+ 6 | b3 = b4 = 0
+ 7 | b5, b6 = 0, 0
+ 8 | b7, b8 = 1
+   | ^^ IF001
+ 9 | 
+10 | ## GOOD
+   |
+   = help: Add explicit public label to the variable `b7`
+
+ℹ Safe fix
+5 5 | b2: int = 0
+6 6 | b3 = b4 = 0
+7 7 | b5, b6 = 0, 0
+8   |-b7, b8 = 1
+  8 |+b7, b8 = 1 # iflabel {}
+9 9 | 
+10 10 | ## GOOD
+11 11 | 
+
+IF001.py:8:5: IF001 [*] Missing variable label for `b8` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel { ... }` or `iflabel {}` for public.
+   |
+ 6 | b3 = b4 = 0
+ 7 | b5, b6 = 0, 0
+ 8 | b7, b8 = 1
+   |     ^^ IF001
+ 9 | 
+10 | ## GOOD
+   |
+   = help: Add explicit public label to the variable `b8`
+
+ℹ Safe fix
+5 5 | b2: int = 0
+6 6 | b3 = b4 = 0
+7 7 | b5, b6 = 0, 0
+8   |-b7, b8 = 1
+  8 |+b7, b8 = 1 # iflabel {}
+9 9 | 
+10 10 | ## GOOD
+11 11 |

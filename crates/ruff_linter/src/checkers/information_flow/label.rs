@@ -34,9 +34,9 @@ impl Label {
         format!("{{ {} }}", principals)
     }
 
-    /// Check labels direction convertion i.e. you can move down in the lattice, not up
-    /// 
-    ///       AB 
+    /// Check labels direction conversion i.e. you can move down in the lattice, not up
+    ///
+    ///       AB
     ///      / \
     ///     A   B
     ///      \ /
@@ -137,7 +137,7 @@ mod test_labels {
     }
 
     #[test]
-    fn test_label_convertion() {
+    fn test_label_conversion() {
         let label1 = Label::new(vec!["alice".to_string(), "bob".to_string()]);
         let label2 = Label::new(vec!["alice".to_string()]);
         let label3 = Label::new(vec!["bob".to_string()]);
