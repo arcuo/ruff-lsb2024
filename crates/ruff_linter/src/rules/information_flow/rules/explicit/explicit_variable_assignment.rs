@@ -5,7 +5,13 @@ use ruff_python_ast::{
     ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
 
-use crate::checkers::{ast::Checker, information_flow::{helper::{get_label_for_expression, get_variable_label_by_name}, label::Label}};
+use crate::checkers::{
+    ast::Checker,
+    information_flow::{
+        helper::{get_label_for_expression, get_variable_label_by_name},
+        label::Label,
+    },
+};
 
 /// ## What it does
 /// Check confidentiality of information flow in variable assignments.
@@ -77,6 +83,8 @@ pub(crate) fn inconfidential_assign_target_statement(
 }
 
 /// Check if a variable assignment has correct information flow, in terms of confidentiality.
+/// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking implicit flow)
+///
 /// I.e. the variable label is more restrictive than the value label or the same.
 fn is_inconfidential_assign_statement(
     checker: &mut Checker,

@@ -15,6 +15,10 @@ mod tests {
     #[test_case(Rule::IFMustIncludeVariableLabel, Path::new("IF001.py"))]
     #[test_case(Rule::IFMissingPrincipal, Path::new("IF002.py"))]
     #[test_case(Rule::IFInconfidentialVariableAssign, Path::new("IF101.py"))]
+    #[test_case(Rule::IFImplicitInconfidentialVariableAssign, Path::new("IF201_if.py"))]
+    #[test_case(Rule::IFImplicitInconfidentialVariableAssign, Path::new("IF201_loop.py"))]
+    #[test_case(Rule::IFImplicitInconfidentialVariableAssign, Path::new("IF201_combine.py"))]
+    #[test_case(Rule::IFImplicitInconfidentialVariableAssign, Path::new("IF201_assert.py"))]
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

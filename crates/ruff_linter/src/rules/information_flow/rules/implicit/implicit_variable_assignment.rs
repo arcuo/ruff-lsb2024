@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCompare, ExprDict, ExprIf, ExprList,
-    ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
+    ExprName, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
 
 use crate::checkers::{
@@ -32,10 +32,9 @@ use crate::checkers::{
 /// ```
 #[violation]
 pub struct IFImplicitInconfidentialVariableAssign {
-    var: String,
-    var_label: Label,
-    expr: String,
-    expr_label: Label,
+    target: String,
+    target_label: Label,
+    pc_expr: String,
     pc: Label,
 }
 
@@ -51,27 +50,57 @@ impl Violation for IFImplicitInconfidentialVariableAssign {
 pub(crate) fn implicit_inconfidential_assign_targets_statement(
     checker: &mut Checker,
     targets: &Vec<Expr>,
-    value: &Expr,
 ) {
+    // if pc is public, no need to check.
+    if checker.information_flow().get_pc_label().is_public() {
+        return;
+    }
+
     for target in targets {
-        implicit_inconfidential_assign_target_statement(checker, target, value);
+        implicit_inconfidential_assign_target_statement(checker, target);
     }
 }
 
 /// IF201
+/// T_ASSIGN_IMPLICIT: max(pc | label(value)) <= label(target)
+///
+/// Explicit is handled by the explicit_variable_assignment.rs so we only check for implicit flows here i.e. pc <= label(target)
+///
+/// Check that the max between the value and the target is less than or equal to the target label.
+/// E.g. if the target has public but either the value or the target has secret, then it is a violation.
 pub(crate) fn implicit_inconfidential_assign_target_statement(
     checker: &mut Checker,
     target: &Expr,
-    value: &Expr,
 ) {
+    // if pc is public, no need to check.
+    if checker.information_flow().get_pc_label().is_public() {
+        return;
+    }
+
     match target {
         Expr::Tuple(ExprTuple { elts, .. }) => {
             for element in elts {
-                implicit_inconfidential_assign_target_statement(checker, element, value);
+                implicit_inconfidential_assign_target_statement(checker, element);
             }
         }
-        Expr::Name(_) => {
-           todo!()
+        Expr::Name(name_target) => {
+            let target_label = get_variable_label_by_name(checker, name_target);
+            let pc = checker.information_flow().get_pc_label();
+
+            if let Some(target_label) = target_label {
+                if pc > target_label {
+                    let pc_expr_range = checker.information_flow().get_pc_expr_range();
+                    checker.diagnostics.push(Diagnostic::new(
+                        IFImplicitInconfidentialVariableAssign {
+                            target: name_target.id.clone(),
+                            target_label,
+                            pc_expr: checker.locator().slice(pc_expr_range).to_string(),
+                            pc,
+                        },
+                        target.range(),
+                    ));
+                }
+            }
         }
         _ => {}
     }

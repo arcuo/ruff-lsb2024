@@ -63,6 +63,21 @@ impl Label {
         label.principals == self.principals
     }
 }
+
+impl PartialOrd for Label {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self == other {
+            return Some(std::cmp::Ordering::Equal);
+        }
+
+        if self.is_higher_in_lattice_path(other) {
+            return Some(std::cmp::Ordering::Greater);
+        } else {
+            return Some(std::cmp::Ordering::Less);
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct LabelParseError;
 

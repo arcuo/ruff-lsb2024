@@ -922,6 +922,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_boolean_test(test);
                 self.visit_body(body);
                 self.visit_body(orelse);
+                self.information_flow.pop_pc();
             }
             Stmt::If(
                 stmt_if @ ast::StmtIf {
@@ -948,7 +949,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.push_branch();
                     self.visit_elif_else_clause(clause);
                     self.semantic.pop_branch();
+                    self.information_flow.pop_pc();
                 }
+
+                self.information_flow.pop_pc();
             }
             _ => visitor::walk_stmt(self, stmt),
         };
@@ -1793,8 +1797,7 @@ impl<'a> Checker<'a> {
 
         // Get label of the statement and add to information_flow.pc
         if let Some(label) = get_label_for_expression(self, expr) {
-            self.information_flow.set_pc(label); 
-            // TODO: We must check the highest label in the expression because of nested if
+            self.information_flow.set_pc(label, expr.range());
         }
     }
 

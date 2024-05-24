@@ -1086,6 +1086,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker, &target, &value,
                 );
             }
+            if checker.enabled(Rule::IFImplicitInconfidentialVariableAssign) {
+                information_flow::rules::implicit_inconfidential_assign_target_statement(
+                    checker, &target,
+                );
+            }
             if checker.enabled(Rule::SelfOrClsAssignment) {
                 pylint::rules::self_or_cls_assignment(checker, target);
             }
@@ -1456,6 +1461,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     &assign.value,
                 );
             }
+            if checker.enabled(Rule::IFImplicitInconfidentialVariableAssign) {
+                information_flow::rules::implicit_inconfidential_assign_targets_statement(
+                    checker,
+                    &assign.targets,
+                );
+            }
             if checker.enabled(Rule::IFMustIncludeVariableLabel) {
                 information_flow::rules::must_include_targets_variable_label(
                     checker,
@@ -1613,6 +1624,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::IFInconfidentialVariableAssign) {
                     information_flow::rules::inconfidential_assign_target_statement(
                         checker, &target, value,
+                    );
+                }
+                if checker.enabled(Rule::IFImplicitInconfidentialVariableAssign) {
+                    information_flow::rules::implicit_inconfidential_assign_target_statement(
+                        checker, &target,
                     );
                 }
                 if checker.enabled(Rule::IFMustIncludeVariableLabel) {

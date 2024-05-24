@@ -12,6 +12,14 @@ use super::{
     principals::{initiate_principals, Principals},
 };
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct PC {
+    /// The current PC label
+    label: Label,
+    /// The range of the statement where the PC is set
+    range: TextRange,
+}
+
 /// State of the information flow
 #[derive()]
 pub(crate) struct InformationFlowState {
@@ -19,7 +27,7 @@ pub(crate) struct InformationFlowState {
     #[allow(dead_code)]
     principals: Principals,
     // The current scope level queue. The level is updated according to the scope by popping and
-    pc: VecDeque<Label>,
+    pc: VecDeque<PC>,
     // Map from variable name to
     variable_map: FxHashMap<BindingId, Label>,
 }
@@ -34,16 +42,32 @@ impl InformationFlowState {
     }
 
     /// Return the current level of the information flow state
-    pub(crate) fn get_pc(&self) -> Label {
+    pub(crate) fn get_pc_label(&self) -> Label {
         return match self.pc.front() {
-            Some(pc) => pc.clone(),
-            None => Label::new_public(),
+            Some(pc) => pc.label.clone(),
+            None => Label::new_public(), // TODO: Should this be public by default?
         };
     }
 
-    /// Set the current level of the information flow state
-    pub(crate) fn set_pc(&mut self, pc: Label) {
-        self.pc.push_front(pc);
+    pub(crate) fn get_pc_expr_range(&self) -> TextRange {
+        return match self.pc.front() {
+            Some(pc) => pc.range.clone(),
+            None => TextRange::default(),
+        };
+    }
+
+    /// Set the current level of the information flow state.
+    /// If PC is higher from before, add that instead.
+    pub(crate) fn set_pc(&mut self, pc: Label, range: TextRange) {
+        let current_pc = self.get_pc_label();
+        if current_pc > pc {
+            self.pc.push_front(PC {
+                label: current_pc,
+                range: self.get_pc_expr_range(),
+            });
+        } else {
+            self.pc.push_front(PC { label: pc, range });
+        }
     }
 
     /// Pop the current level of the information flow state
