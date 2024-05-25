@@ -211,7 +211,7 @@ pub(crate) fn read_variable_label_from_source(
     if let Some(comment_range) = inline_label_comment {
         let comment_text: &str = &locator.slice(comment_range).replace('#', "");
         if let Ok(label) = comment_text.parse::<Label>() {
-            return Some((label, comment_range.clone()));
+            return Some((label, *comment_range));
         }
     } else {
         // Find comment on previous line if it exists
@@ -227,32 +227,11 @@ pub(crate) fn read_variable_label_from_source(
         if let Some(comment_range) = preline_label_comment {
             let comment_text: &str = &locator.slice(comment_range).replace('#', "");
             if let Ok(label) = comment_text.parse::<Label>() {
-                return Some((label, comment_range.clone()));
-            } else {
-                return None;
+                return Some((label, *comment_range));
             }
-            BindingKind::Annotation => todo!(),
-            BindingKind::NamedExprAssignment => todo!(),
-            BindingKind::TypeParam => todo!(),
-            BindingKind::LoopVar => todo!(),
-            BindingKind::ComprehensionVar => todo!(),
-            BindingKind::WithItemVar => todo!(),
-            BindingKind::Global => todo!(),
-            BindingKind::Nonlocal(_) => todo!(),
-            BindingKind::Builtin => todo!(),
-            BindingKind::ClassDefinition(_) => todo!(),
-            BindingKind::Export(_) => todo!(),
-            BindingKind::FutureImport => todo!(),
-            BindingKind::Import(_) => todo!(),
-            BindingKind::FromImport(_) => todo!(),
-            BindingKind::SubmoduleImport(_) => todo!(),
-            BindingKind::Deletion => todo!(),
-            BindingKind::ConditionalDeletion(_) => todo!(),
-            BindingKind::BoundException => todo!(),
-            BindingKind::UnboundException(_) => todo!(),
         }
     }
-    return None;
+    None
 }
 
 #[cfg(test)]

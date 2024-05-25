@@ -3,11 +3,11 @@ def help(a,b):
   # Checking internal run of the function using arg labels
   some_outer_secret_value = a # OK
   some_outer_public_value = a # FAIL a is secret
-  return public # OK
+  return b # OK
   return secret # OK but not if return was "public"
 
 secret = 1 # iflabel {Alice}
-public = 2 # iflabel {}
+public = 2 # iflabel {Bob}
 
 # # Checking args
 # help(secret, public) # OK
@@ -15,4 +15,4 @@ public = 2 # iflabel {}
 
 # Checking return
 # secret = help(secret, public) # OK
-public = help(secret, public) # Fail public cannot be assigned a secret return value from help
+secret = help(secret, public) # Fail public cannot be assigned a secret return value from help
