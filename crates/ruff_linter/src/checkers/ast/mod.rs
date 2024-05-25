@@ -740,19 +740,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope(); // Function scope
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
-                let binding_id = self.add_binding(
+                self.add_binding(
                     name,
                     stmt.identifier(),
                     BindingKind::FunctionDefinition(scope_id),
                     BindingFlags::empty(),
                 );
-                // Run through all the parameters and add their name to the function_parameter_map
-                for (parameter_index, parameter) in (&**parameters).into_iter().enumerate() {
-                    let name = parameter.name();
-
-                    self.information_flow
-                        .add_parameter_name(binding_id, name, parameter_index);
-                }
             }
             Stmt::ClassDef(
                 class_def @ ast::StmtClassDef {
@@ -1856,14 +1849,25 @@ impl<'a> Checker<'a> {
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind.clone(), flags);
 
-        self.information_flow.add_variable_label_binding(
-            binding_id,
-            range,
-            self.locator(),
-            self.indexer().comment_ranges(),
-            &kind,
-            name,
-        );
+        match kind {
+            BindingKind::FunctionDefinition(_) => {
+                self.information_flow.add_function_variable_label_binding(
+                    binding_id,
+                    range,
+                    self.locator(),
+                    self.indexer().comment_ranges(),
+                );
+            }
+            BindingKind::Argument => {}
+            _ => {
+                self.information_flow.add_variable_label_binding(
+                    binding_id,
+                    range,
+                    self.locator(),
+                    self.indexer().comment_ranges(),
+                );
+            }
+        }
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {
@@ -1914,20 +1918,6 @@ impl<'a> Checker<'a> {
             self.semantic
                 .shadowed_bindings
                 .insert(binding_id, shadowed_id);
-        } else {
-            // No shadowed binding, so this is a new binding.
-            // Add variable label to information flow
-
-            // TODO: Add check for is information flow is enabled
-            // TODO: Inherit binding from value
-            // TODO: Are there times when we can skip this?
-            self.information_flow.add_variable_label_binding(
-                binding_id,
-                range,
-                self.locator(),
-                self.indexer().comment_ranges(),
-                None,
-            );
         }
 
         // Add the binding to the scope.
@@ -2265,13 +2255,34 @@ impl<'a> Checker<'a> {
                 self.semantic.restore(snapshot);
 
                 let Stmt::FunctionDef(ast::StmtFunctionDef {
-                    body, parameters, ..
+                    body,
+                    parameters,
+                    name: function_name,
+                    ..
                 }) = self.semantic.current_statement()
                 else {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
 
                 self.visit_parameters(parameters);
+
+                if let Some(function_binding_id) = self.semantic.current_scope().get(function_name)
+                {
+                    for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
+                        let parameter_name = parameter.name.as_str();
+                        if let Some(param_binding_id) =
+                            self.semantic.current_scope().get(parameter_name)
+                        {
+                            self.information_flow
+                                .add_parameter_name_variable_label_binding(
+                                    function_binding_id,
+                                    param_binding_id,
+                                    parameter_name,
+                                );
+                        }
+                    }
+                }
+
                 // Set the docstring state before visiting the function body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);

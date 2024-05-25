@@ -1,6 +1,6 @@
 use ruff_python_ast::{AnyParameterRef, Expr, Identifier};
 use rustc_hash::FxHashMap;
-use std::collections::VecDeque;
+use std::{borrow::BorrowMut, collections::VecDeque};
 
 use ruff_python_index::Indexer;
 use ruff_python_semantic::{BindingId, BindingKind};
@@ -86,27 +86,14 @@ impl InformationFlowState {
     pub(crate) fn get_parameter_label(
         &self,
         function_binding_id: BindingId,
-        index: usize,
+        parameter_name: &str,
     ) -> Option<Label> {
         if let Some(labels) = self.function_parameter_map.get(&function_binding_id) {
-            if let Some(label) = labels.get(&index.to_string()) {
+            if let Some(label) = labels.get(parameter_name) {
                 return Some(label.clone());
             }
         }
         None
-    }
-
-    pub(crate) fn add_parameter_name(&mut self, binding_id: BindingId, name: &str, index: usize) {
-        // Update the function parameter map with the parameter name
-        // Get the currently indexed label from
-        let label = self.get_parameter_label(binding_id, index);
-
-        if let Some(label) = label {
-            self.function_parameter_map
-                .entry(binding_id)
-                .or_insert_with(FxHashMap::default)
-                .insert(name.to_string(), label);
-        }
     }
 
     fn get_previous_line(locator: &Locator, range: TextRange) -> Option<TextRange> {
@@ -125,24 +112,72 @@ impl InformationFlowState {
         range: TextRange,
         locator: &Locator,
         comment_ranges: &CommentRanges,
-        binding_label: Option<Label>,
+    ) {
+        // Check for label from shadowed bindings
+        // TODO: Declassification (invalid declassification check?)
+
+        // Read from comment
+        if let Ok(label) = get_comment_text(range, locator, comment_ranges)
+            .unwrap_or(String::default())
+            .as_str()
+            .parse::<Label>()
+        {
+            self.variable_map.insert(binding_id, label);
+        } else {
+            // No label comment, add public label
+            self.variable_map.insert(binding_id, Label::new_public());
+        }
+    }
+
+    pub(crate) fn add_function_variable_label_binding(
+        &mut self,
+        binding_id: BindingId,
+        range: TextRange,
+        locator: &Locator,
+        comment_ranges: &CommentRanges,
     ) {
         // Check for label from shadowed bindings
         // TODO: Implement inheritance from shadowed bindings
         // TODO: Declassification (invalid declassification check?)
 
-        // Use the label if it is provided
-        if let Some(label) = binding_label {
-            self.variable_map.insert(binding_id, label);
-            return;
-        }
-
         // Read from comment
-        if let Some((label, ..)) = read_variable_label_from_source(range, locator, comment_ranges) {
-            self.variable_map.insert(binding_id, label);
+        if let Ok(fn_label) = get_comment_text(range, locator, comment_ranges)
+            .unwrap_or(String::default())
+            .as_str()
+            .parse::<FunctionLabel>()
+        {
+            self.variable_map.insert(binding_id, fn_label.return_label);
+            for (name, label) in fn_label.argument_labels.iter() {
+                self.function_parameter_map
+                    .entry(binding_id)
+                    .or_insert_with(FxHashMap::default)
+                    .insert(name.clone(), label.clone());
+            }
         } else {
             // No label comment, add public label
             self.variable_map.insert(binding_id, Label::new_public());
+        }
+    }
+
+    pub(crate) fn add_parameter_name_variable_label_binding(
+        &mut self,
+        function_binding_id: BindingId,
+        parameter_binding_id: BindingId,
+        parameter_name: &str,
+    ) {
+        // Check for label from shadowed bindings
+        // TODO: Implement inheritance from shadowed bindings
+        // TODO: Declassification (invalid declassification check?)
+
+        // Insert arguments into variable map based on binding_id and parameter name
+        if let Some(fucntion_label) = self.get_parameter_label(function_binding_id, &parameter_name)
+        {
+            self.variable_map
+                .insert(parameter_binding_id, fucntion_label);
+        } else {
+            // No label comment, add public label
+            self.variable_map
+                .insert(parameter_binding_id, Label::new_public());
         }
     }
 
@@ -151,39 +186,34 @@ impl InformationFlowState {
     }
 }
 
-/// Read the variable label from the source code and return [`Label`] if found
+/// Get the comment text inline or line above
 /// and the [`TextRange`] of the label
-pub(crate) fn read_variable_label_from_source(
+pub(crate) fn get_comment_text(
     range: TextRange,
     locator: &Locator,
     comment_ranges: &CommentRanges,
-) -> Option<(Label, TextRange)> {
+) -> Option<String> {
     // Find comment on same line
     let line_range = locator.line_range(range.start());
     let inline_label_comment = comment_ranges.comments_in_range(line_range).first();
 
     if let Some(comment_range) = inline_label_comment {
-        let comment_text: &str = &locator.slice(comment_range).replace('#', "");
-        if let Ok(label) = comment_text.parse::<Label>() {
-            return Some((label, *comment_range));
-        }
+        let comment_text = locator.slice(comment_range).replace('#', "");
+        return Some(comment_text);
+    }
+    // Find comment on previous line if it exists
+    let start_range = range.start().to_u32();
+    let preline_label_comment = if start_range != 0 {
+        comment_ranges
+            .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
+            .first()
     } else {
-        // Find comment on previous line if it exists
-        let start_range = range.start().to_u32();
-        let preline_label_comment = if start_range != 0 {
-            comment_ranges
-                .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
-                .first()
-        } else {
-            return None;
-        };
+        return None;
+    };
 
-        if let Some(comment_range) = preline_label_comment {
-            let comment_text: &str = &locator.slice(comment_range).replace('#', "");
-            if let Ok(label) = comment_text.parse::<Label>() {
-                return Some((label, *comment_range));
-            }
-        }
+    if let Some(comment_range) = preline_label_comment {
+        let comment_text = locator.slice(comment_range).replace('#', "");
+        return Some(comment_text);
     }
     None
 }
@@ -232,8 +262,6 @@ c = 3
                             range,
                             &locator,
                             comment_ranges,
-                            &kind,
-                            "",
                         );
                     }
                 }
@@ -303,8 +331,6 @@ a = 1
                                 range,
                                 &locator,
                                 comment_ranges,
-                                &kind,
-                                "",
                             );
                         }
                         _ => {}
@@ -352,8 +378,6 @@ b = 2 # iflabel {}
                             range,
                             &locator,
                             comment_ranges,
-                            &kind,
-                            "",
                         );
                     }
                 }
@@ -371,72 +395,5 @@ b = 2 # iflabel {}
             &state.variable_map[&BindingId::from(1u32)],
             &Label::new_public()
         );
-    }
-
-    #[test]
-    fn test_information_flow_state_function() {
-        let source: &str = r#"
-# iflabel fn ({secret}, {public}) {secret}
-def help(a,b):
-  # Checking internal run of the function using arg labels
-  some_outer_secret_value = a # OK
-  some_outer_public_value = a # FAIL a is secret
-  return public # OK
-  return secret # OK but not if return was "public"
-
-secret = 1 # iflabel {secret}
-public = 2 # iflabel {secret}
-
-# Checking args
-help(secret, public) # OK
-help(public, secret) # Fail b has a public label
-
-# Checking return
-secret = help(secret, public) # OK
-public = help(secret, public) # Fail public cannot be assigned a secret return value from help
-"#;
-
-        let tokens = tokenize(source, Mode::Module);
-        let locator = Locator::new(source);
-        let indexer = Indexer::from_tokens(&tokens, &locator);
-        let comment_ranges = indexer.comment_ranges();
-        let result = parse_program(source);
-        let kind = BindingKind::FunctionDefinition(ScopeId::from(0u32));
-        let mut state = InformationFlowState::new(&indexer, &locator);
-
-        let mut id: BindingId = BindingId::from(0u32);
-
-        match result {
-            Ok(module) => {
-                let stmts = module.body;
-                for stmt in stmts {
-                    match stmt {
-                        Stmt::FunctionDef(StmtFunctionDef { range, name, .. }) => {
-                            let binding_id: BindingId = id;
-                            id = (id.as_u32() + 1).into();
-                            state.add_variable_label_binding(
-                                binding_id,
-                                range,
-                                &locator,
-                                comment_ranges,
-                                &kind,
-                                &name.id,
-                            );
-                            state.add_variable_label_binding(
-                                binding_id + 1,
-                                range,
-                                &locator,
-                                comment_ranges,
-                                &BindingKind::Argument,
-                                "a",
-                            );
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            Err(_) => panic!("Failed to parse module"),
-        }
-        assert!(false);
     }
 }

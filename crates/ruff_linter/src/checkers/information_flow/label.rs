@@ -1,3 +1,4 @@
+use itertools::Tuples;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{collections::hash_map, str::FromStr};
@@ -6,8 +7,8 @@ lazy_static! {
     static ref LABEL_REGEX: Regex =
         Regex::new(r"(iflabel)?\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
     static ref FUNCTION_LABEL_REGEX: Regex =
-        Regex::new(r"iflabel\s*fn\s*\(\s*(?P<arg>[\{\w\s,\}]+)?\s*\)\s*(?P<return>[\{\w\s,\}]+)?")
-            .unwrap();
+        Regex::new(r"iflabel\s+fn\s*\(\s*(?P<arg>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z]\}]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})\s*\)\s*\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)\s*\}").unwrap();
+    static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w])\s*:\s*\{(?P<label>[\w\s*,]+)\}").unwrap();
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]
@@ -70,7 +71,7 @@ impl Label {
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]
 pub(crate) struct FunctionLabel {
-    pub(crate) argument_labels: Vec<Label>,
+    pub(crate) argument_labels: Vec<(String, Label)>,
     pub(crate) return_label: Label,
 }
 impl FunctionLabel {
@@ -83,7 +84,11 @@ impl FunctionLabel {
             .collect::<Vec<String>>()
             .join(", ");
 
-        format!("{{ {} }} {{{}}}", argument_labels, self.return_label.to_string())
+        format!(
+            "{{ {} }} {{{}}}",
+            argument_labels,
+            self.return_label.to_string()
+        )
     }
 }
 /// Note that this not strictly the total order. Instead it counts as the sqsubseteq relation
@@ -98,9 +103,8 @@ impl PartialOrd for Label {
 
         if self.is_higher_in_lattice_path(other) {
             return Some(std::cmp::Ordering::Greater);
-        } else {
-            return Some(std::cmp::Ordering::Less);
         }
+        return Some(std::cmp::Ordering::Less);
     }
 }
 
@@ -142,18 +146,32 @@ impl FromStr for FunctionLabel {
         match FUNCTION_LABEL_REGEX.captures(string) {
             Some(captures) => {
                 let argument_labels = match captures.name("arg") {
-                    Some(label) => label
-                        .as_str()
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.parse::<Label>().unwrap())
-                        .collect::<Vec<Label>>(),
+                    Some(arg) => {
+                        let mut labels = vec![];
+                        for arg_label in arg.as_str().split(',') {
+                            let captures = ARG_LABEL_REGEX.captures(arg_label);
+                            match captures {
+                                Some(captures) => {
+                                    let argname = captures.name("argname").unwrap().as_str();
+                                    let label = captures.name("label").unwrap().as_str();
+                                    labels.push((
+                                        argname.to_string(),
+                                        label.parse::<Label>().unwrap(),
+                                    ));
+                                }
+                                None => return Err(LabelParseError),
+                            }
+                        }
+                        labels
+                    }
                     None => vec![],
                 };
-                let return_label = match captures.name("return") {
-                    Some(label) => label.as_str().parse::<Label>().unwrap(),
-                    None => Label::new_public(),
+                let return_label = match captures.name("returnlabel") {
+                    Some(label) => {
+                        let label = label.as_str();
+                        Label::new(label.split(',').map(|s| s.trim().to_string()).collect())
+                    }
+                    None => return Err(LabelParseError),
                 };
                 Ok(FunctionLabel {
                     argument_labels,
