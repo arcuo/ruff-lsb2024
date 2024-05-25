@@ -1,7 +1,6 @@
-use itertools::Tuples;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{collections::hash_map, str::FromStr};
+use std::str::FromStr;
 
 lazy_static! {
     static ref LABEL_REGEX: Regex =
@@ -80,7 +79,7 @@ impl FunctionLabel {
         let argument_labels = self
             .argument_labels
             .iter()
-            .map(|label| label.to_string())
+            .map(|(name, label)| format!("{}: {}", name, label.to_string()))
             .collect::<Vec<String>>()
             .join(", ");
 

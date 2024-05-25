@@ -17,6 +17,7 @@ mod tests {
     #[test_case(Rule::IFMissingPrincipal, Path::new("IF002.py"))]
     // Explicit
     #[test_case(Rule::IFExplicitVariableAssign, Path::new("IF101.py"))] // TODO: split into multiple tests
+    #[test_case(Rule::IFExplicitVariableAssign, Path::new("IF101_fun.py"))]
 
     // Implicit
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201_if.py"))]

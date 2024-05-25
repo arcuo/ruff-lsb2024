@@ -1,9 +1,8 @@
-use ruff_python_ast::{AnyParameterRef, Expr, Identifier};
 use rustc_hash::FxHashMap;
-use std::{borrow::BorrowMut, collections::VecDeque};
+use std::collections::VecDeque;
 
 use ruff_python_index::Indexer;
-use ruff_python_semantic::{BindingId, BindingKind};
+use ruff_python_semantic::BindingId;
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
@@ -96,16 +95,6 @@ impl InformationFlowState {
         None
     }
 
-    fn get_previous_line(locator: &Locator, range: TextRange) -> Option<TextRange> {
-        let current_line = locator.line_range(range.start());
-        if (current_line.start().to_u32()) == 0 {
-            return None;
-        }
-
-        let previous_line = locator.line_range(TextSize::from(current_line.start().to_u32() - 1));
-        Some(previous_line)
-    }
-
     pub(crate) fn add_variable_label_binding(
         &mut self,
         binding_id: BindingId,
@@ -117,16 +106,15 @@ impl InformationFlowState {
         // TODO: Declassification (invalid declassification check?)
 
         // Read from comment
-        if let Ok(label) = get_comment_text(range, locator, comment_ranges)
-            .unwrap_or(String::default())
-            .as_str()
-            .parse::<Label>()
-        {
-            self.variable_map.insert(binding_id, label);
-        } else {
-            // No label comment, add public label
-            self.variable_map.insert(binding_id, Label::new_public());
+        if let Some((label, _)) = get_comment_text(range, locator, comment_ranges) {
+            if let Ok(label) = label.as_str().parse::<Label>() {
+                self.variable_map.insert(binding_id, label);
+                return;
+            }
         }
+
+        // No label comment, add public label
+        self.variable_map.insert(binding_id, Label::new_public());
     }
 
     pub(crate) fn add_function_variable_label_binding(
@@ -141,21 +129,17 @@ impl InformationFlowState {
         // TODO: Declassification (invalid declassification check?)
 
         // Read from comment
-        if let Ok(fn_label) = get_comment_text(range, locator, comment_ranges)
-            .unwrap_or(String::default())
-            .as_str()
-            .parse::<FunctionLabel>()
-        {
-            self.variable_map.insert(binding_id, fn_label.return_label);
-            for (name, label) in fn_label.argument_labels.iter() {
-                self.function_parameter_map
-                    .entry(binding_id)
-                    .or_insert_with(FxHashMap::default)
-                    .insert(name.clone(), label.clone());
+        if let Some((label, _)) = get_comment_text(range, locator, comment_ranges) {
+            if let Ok(fn_label) = label.as_str().parse::<FunctionLabel>() {
+                self.variable_map.insert(binding_id, fn_label.return_label);
+                for (name, label) in fn_label.argument_labels.iter() {
+                    self.function_parameter_map
+                        .entry(binding_id)
+                        .or_insert_with(FxHashMap::default)
+                        .insert(name.clone(), label.clone());
+                }
+                return;
             }
-        } else {
-            // No label comment, add public label
-            self.variable_map.insert(binding_id, Label::new_public());
         }
     }
 
@@ -186,43 +170,56 @@ impl InformationFlowState {
     }
 }
 
+pub(crate) fn read_variable_label_from_source(
+    range: TextRange,
+    locator: &Locator,
+    comment_ranges: &CommentRanges,
+) -> Option<(Label, TextRange)> {
+    if let Some((label, comment_range)) = get_comment_text(range, locator, comment_ranges) {
+        if let Ok(label) = label.as_str().parse::<Label>() {
+            return Some((label, comment_range));
+        }
+    }
+    None
+}
+
+fn get_previous_line(locator: &Locator, range: TextRange) -> Option<TextRange> {
+    let current_line = locator.line_range(range.start());
+    if (current_line.start().to_u32()) == 0 {
+        return None;
+    }
+
+    let previous_line = locator.line_range(TextSize::from(current_line.start().to_u32() - 1));
+    Some(previous_line)
+}
+
 /// Get the comment text inline or line above
 /// and the [`TextRange`] of the label
 pub(crate) fn get_comment_text(
     range: TextRange,
     locator: &Locator,
     comment_ranges: &CommentRanges,
-) -> Option<String> {
+) -> Option<(String, TextRange)> {
     // Find comment on same line
     let line_range = locator.line_range(range.start());
-    let inline_label_comment = comment_ranges.comments_in_range(line_range).first();
-
-    if let Some(comment_range) = inline_label_comment {
-        let comment_text = locator.slice(comment_range).replace('#', "");
-        return Some(comment_text);
+    if let Some(inline_comment_range) = comment_ranges.comments_in_range(line_range).first() {
+        let comment_text = locator.slice(inline_comment_range).replace('#', "");
+        return Some((comment_text, inline_comment_range.clone()));
     }
+
     // Find comment on previous line if it exists
-    let start_range = range.start().to_u32();
-    let preline_label_comment = if start_range != 0 {
-        comment_ranges
-            .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
-            .first()
-    } else {
-        return None;
+    if let Some(previous_line_range) = get_previous_line(locator, range) {
+        let comment_text = locator.slice(previous_line_range).replace('#', "");
+        return Some((comment_text, previous_line_range.clone()));
     };
 
-    if let Some(comment_range) = preline_label_comment {
-        let comment_text = locator.slice(comment_range).replace('#', "");
-        return Some(comment_text);
-    }
     None
 }
 
 #[cfg(test)]
 mod information_flow_state_tests {
-    use ruff_python_ast::{identifier, Stmt, StmtAssign, StmtFunctionDef};
+    use ruff_python_ast::{Stmt, StmtAssign};
     use ruff_python_parser::{parse_program, tokenize, Mode};
-    use ruff_python_semantic::ScopeId;
 
     use super::*;
 
@@ -243,7 +240,6 @@ c = 3
         let mut state = InformationFlowState::new(&indexer, &locator);
 
         let mut id: BindingId = BindingId::from(0u32);
-        let kind = BindingKind::Assignment;
 
         match result {
             Ok(module) => {
@@ -311,7 +307,6 @@ a = 1
         let result = parse_program(source);
         let mut state = InformationFlowState::new(&indexer, &locator);
 
-        let kind = BindingKind::Assignment;
         let mut id: BindingId = BindingId::from(0u32);
 
         match result {
@@ -356,7 +351,6 @@ b = 2 # iflabel {}
         let indexer = Indexer::from_tokens(&tokens, &locator);
         let comment_ranges = indexer.comment_ranges();
         let result = parse_program(source);
-        let kind = BindingKind::Assignment;
         let mut state = InformationFlowState::new(&indexer, &locator);
 
         let mut id: BindingId = BindingId::from(0u32);
