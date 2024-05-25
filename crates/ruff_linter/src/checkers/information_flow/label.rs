@@ -35,12 +35,13 @@ impl Label {
     }
 
     /// Check labels direction conversion i.e. you can move down in the lattice, not up
-    ///
+    /// ```latex
     ///       AB
     ///      / \
     ///     A   B
     ///      \ /
     ///       0
+    /// ```
     pub(crate) fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
         // If the test label is public, then it is never more restrictive
         if label.is_public() {
