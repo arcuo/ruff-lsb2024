@@ -1081,9 +1081,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, value, .. }) => {
-            if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+            if checker.enabled(Rule::IFExplicitVariableAssign) {
                 information_flow::rules::inconfidential_assign_target_statement(
                     checker, &target, &value,
+                );
+            }
+            if checker.enabled(Rule::IFImplicitVariableAssign) {
+                information_flow::rules::implicit_inconfidential_assign_target_statement(
+                    checker, &target,
                 );
             }
             if checker.enabled(Rule::SelfOrClsAssignment) {
@@ -1449,11 +1454,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ..
             },
         ) => {
-            if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+            if checker.enabled(Rule::IFExplicitVariableAssign) {
                 information_flow::rules::inconfidential_assign_targets_statement(
                     checker,
                     &assign.targets,
                     &assign.value,
+                );
+            }
+            if checker.enabled(Rule::IFImplicitVariableAssign) {
+                information_flow::rules::implicit_inconfidential_assign_targets_statement(
+                    checker,
+                    &assign.targets,
                 );
             }
             if checker.enabled(Rule::IFMustIncludeVariableLabel) {
@@ -1610,9 +1621,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                     );
                 }
-                if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+                if checker.enabled(Rule::IFExplicitVariableAssign) {
                     information_flow::rules::inconfidential_assign_target_statement(
                         checker, &target, value,
+                    );
+                }
+                if checker.enabled(Rule::IFImplicitVariableAssign) {
+                    information_flow::rules::implicit_inconfidential_assign_target_statement(
+                        checker, &target,
                     );
                 }
                 if checker.enabled(Rule::IFMustIncludeVariableLabel) {

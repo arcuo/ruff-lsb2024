@@ -12,6 +12,14 @@ use super::{
     principals::{initiate_principals, Principals},
 };
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct PC {
+    /// The current PC label
+    label: Label,
+    /// The range of the statement where the PC is set
+    range: TextRange,
+}
+
 /// State of the information flow
 #[derive()]
 pub(crate) struct InformationFlowState {
@@ -19,7 +27,7 @@ pub(crate) struct InformationFlowState {
     #[allow(dead_code)]
     principals: Principals,
     // The current scope level queue. The level is updated according to the scope by popping and
-    pc: VecDeque<String>,
+    pc: VecDeque<PC>,
     // Map from variable name to
     variable_map: FxHashMap<BindingId, Label>,
 }
@@ -34,15 +42,37 @@ impl InformationFlowState {
     }
 
     /// Return the current level of the information flow state
-    pub(crate) fn pc(&self) -> String {
+    pub(crate) fn get_pc_label(&self) -> Label {
         return match self.pc.front() {
-            Some(pc) => pc.clone(),
-            None => String::new(),
+            Some(pc) => pc.label.clone(),
+            None => Label::new_public(), // TODO: Should this be public by default?
         };
     }
 
-    pub(crate) fn variable_map(&self) -> &FxHashMap<BindingId, Label> {
-        &self.variable_map
+    pub(crate) fn get_pc_expr_range(&self) -> TextRange {
+        return match self.pc.front() {
+            Some(pc) => pc.range.clone(),
+            None => TextRange::default(),
+        };
+    }
+
+    /// Set the current level of the information flow state.
+    /// If PC is higher from before, add that instead.
+    pub(crate) fn push_pc(&mut self, pc: Label, range: TextRange) {
+        let current_pc = self.get_pc_label();
+        if current_pc > pc {
+            self.pc.push_front(PC {
+                label: current_pc,
+                range: self.get_pc_expr_range(),
+            });
+        } else {
+            self.pc.push_front(PC { label: pc, range });
+        }
+    }
+
+    /// Pop the current level of the information flow state
+    pub(crate) fn pop_pc(&mut self) {
+        self.pc.pop_front();
     }
 
     pub(crate) fn get_label(&self, binding_id: BindingId) -> Option<Label> {
@@ -55,8 +85,19 @@ impl InformationFlowState {
         range: TextRange,
         locator: &Locator,
         comment_ranges: &CommentRanges,
+        binding_label: Option<Label>,
     ) {
-        // Add to variable_map
+        // Check for label from shadowed bindings
+        // TODO: Implement inheritance from shadowed bindings
+        // TODO: Declassification (invalid declassification check?)
+
+        // Use the label if it is provided
+        if let Some(label) = binding_label {
+            self.variable_map.insert(binding_id, label);
+            return;
+        }
+
+        // Read from comment
         if let Some((label, ..)) = read_variable_label_from_source(range, locator, comment_ranges) {
             self.variable_map.insert(binding_id, label);
         } else {
@@ -151,6 +192,7 @@ c = 3
                             range,
                             &locator,
                             comment_ranges,
+                            None,
                         );
                     }
                 }
@@ -219,6 +261,7 @@ a = 1
                                 range,
                                 &locator,
                                 comment_ranges,
+                                None,
                             );
                         }
                         _ => {}
@@ -265,6 +308,7 @@ b = 2 # iflabel {}
                             range,
                             &locator,
                             comment_ranges,
+                            None,
                         );
                     }
                 }

@@ -68,6 +68,7 @@ use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
+use super::information_flow::helper::get_label_for_expression;
 use super::information_flow::information_flow_state::InformationFlowState;
 
 mod analyze;
@@ -921,6 +922,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_boolean_test(test);
                 self.visit_body(body);
                 self.visit_body(orelse);
+                self.information_flow.pop_pc();
+            }
+            Stmt::For(ast::StmtFor { iter, .. }) => {
+                // For information flow, handle block PC (Implicit)
+                if let Some(label) = get_label_for_expression(self, iter) {
+                    self.information_flow.push_pc(label.clone(), iter.range());
+                }
+
+                visitor::walk_stmt(self, stmt);
+
+                // For information flow, pop block PC
+                self.information_flow.pop_pc();
             }
             Stmt::If(
                 stmt_if @ ast::StmtIf {
@@ -947,7 +960,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.push_branch();
                     self.visit_elif_else_clause(clause);
                     self.semantic.pop_branch();
+                    self.information_flow.pop_pc();
                 }
+
+                self.information_flow.pop_pc();
             }
             _ => visitor::walk_stmt(self, stmt),
         };
@@ -1789,6 +1805,11 @@ impl<'a> Checker<'a> {
         self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
         self.semantic.flags = snapshot;
+
+        // Get label of the statement and add to information_flow.pc
+        if let Some(label) = get_label_for_expression(self, expr) {
+            self.information_flow.push_pc(label, expr.range());
+        }
     }
 
     /// Visit an [`ElifElseClause`]
@@ -1885,6 +1906,7 @@ impl<'a> Checker<'a> {
                 range,
                 self.locator(),
                 self.indexer().comment_ranges(),
+                None,
             );
         }
 

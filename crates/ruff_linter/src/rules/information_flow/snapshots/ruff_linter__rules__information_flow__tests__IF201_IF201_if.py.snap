@@ -1,0 +1,142 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+---
+IF201_if.py:9:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+ 8 | if secret_var > 0: # PC = {secret}
+ 9 |     public_var = 0 # Fail
+   |     ^^^^^^^^^^ IF201
+10 |     public_var += 1 # Fail
+11 |     public_var: int = 2 # Fail
+   |
+
+IF201_if.py:10:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+ 8 | if secret_var > 0: # PC = {secret}
+ 9 |     public_var = 0 # Fail
+10 |     public_var += 1 # Fail
+   |     ^^^^^^^^^^ IF201
+11 |     public_var: int = 2 # Fail
+   |
+
+IF201_if.py:11:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+ 9 |     public_var = 0 # Fail
+10 |     public_var += 1 # Fail
+11 |     public_var: int = 2 # Fail
+   |     ^^^^^^^^^^ IF201
+12 | 
+13 |     secret_var = 0 # Success
+   |
+
+IF201_if.py:18:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+17 |     if public_var > 0: # Nested if does not decrease the pc {secret}
+18 |         public_var = 0 # Fail
+   |         ^^^^^^^^^^ IF201
+19 |         public_var += 1 # Fail
+20 |         public_var: int = 2 # Fail
+   |
+
+IF201_if.py:19:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+17 |     if public_var > 0: # Nested if does not decrease the pc {secret}
+18 |         public_var = 0 # Fail
+19 |         public_var += 1 # Fail
+   |         ^^^^^^^^^^ IF201
+20 |         public_var: int = 2 # Fail
+   |
+
+IF201_if.py:20:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+18 |         public_var = 0 # Fail
+19 |         public_var += 1 # Fail
+20 |         public_var: int = 2 # Fail
+   |         ^^^^^^^^^^ IF201
+21 | 
+22 | elif public_var > 0: # Still in the same block i.e. the initial block sets the pc {secret}
+   |
+
+IF201_if.py:23:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+22 | elif public_var > 0: # Still in the same block i.e. the initial block sets the pc {secret}
+23 |     public_var = 0 # Fail
+   |     ^^^^^^^^^^ IF201
+24 |     public_var += 1 # Fail
+25 |     public_var: int = 2 # Fail
+   |
+
+IF201_if.py:24:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+22 | elif public_var > 0: # Still in the same block i.e. the initial block sets the pc {secret}
+23 |     public_var = 0 # Fail
+24 |     public_var += 1 # Fail
+   |     ^^^^^^^^^^ IF201
+25 |     public_var: int = 2 # Fail
+   |
+
+IF201_if.py:25:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+23 |     public_var = 0 # Fail
+24 |     public_var += 1 # Fail
+25 |     public_var: int = 2 # Fail
+   |     ^^^^^^^^^^ IF201
+26 | 
+27 | else: # Still in the same block i.e. the initial test sets the pc {secret}
+   |
+
+IF201_if.py:28:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+27 | else: # Still in the same block i.e. the initial test sets the pc {secret}
+28 |     public_var = 0 # Fail
+   |     ^^^^^^^^^^ IF201
+29 |     public_var += 1 # Fail
+30 |     public_var: int = 2 # Fail
+   |
+
+IF201_if.py:29:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+27 | else: # Still in the same block i.e. the initial test sets the pc {secret}
+28 |     public_var = 0 # Fail
+29 |     public_var += 1 # Fail
+   |     ^^^^^^^^^^ IF201
+30 |     public_var: int = 2 # Fail
+   |
+
+IF201_if.py:30:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 8
+   |
+28 |     public_var = 0 # Fail
+29 |     public_var += 1 # Fail
+30 |     public_var: int = 2 # Fail
+   |     ^^^^^^^^^^ IF201
+31 | 
+32 | # PC should be reset after block
+   |
+
+IF201_if.py:51:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 50
+   |
+50 |     if secret_var == 0: # Nested if increases the pc {secret}
+51 |         public_var = 0 # Fail
+   |         ^^^^^^^^^^ IF201
+52 |         public_var += 1 # Fail
+53 |         public_var: int = 2 # Fail
+   |
+
+IF201_if.py:52:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 50
+   |
+50 |     if secret_var == 0: # Nested if increases the pc {secret}
+51 |         public_var = 0 # Fail
+52 |         public_var += 1 # Fail
+   |         ^^^^^^^^^^ IF201
+53 |         public_var: int = 2 # Fail
+   |
+
+IF201_if.py:53:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 50
+   |
+51 |         public_var = 0 # Fail
+52 |         public_var += 1 # Fail
+53 |         public_var: int = 2 # Fail
+   |         ^^^^^^^^^^ IF201
+54 | 
+55 |         secret_var = 0 # Success
+   |
