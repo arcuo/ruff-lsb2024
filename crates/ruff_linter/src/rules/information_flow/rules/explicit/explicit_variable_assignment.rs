@@ -29,14 +29,14 @@ use crate::checkers::{
 /// public_var = secret_var  # Label violation as {secret} -> {} is not allowed
 /// ```
 #[violation]
-pub struct IFInconfidentialVariableAssign {
+pub struct IFExplicitVariableAssign {
     var: String,
     var_label: Label,
     expr: String,
     expr_label: Label,
 }
 
-impl Violation for IFInconfidentialVariableAssign {
+impl Violation for IFExplicitVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -59,6 +59,7 @@ pub(crate) fn inconfidential_assign_targets_statement(
 }
 
 /// IF101
+/// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking implicit flow)
 pub(crate) fn inconfidential_assign_target_statement(
     checker: &mut Checker,
     target: &Expr,
@@ -70,55 +71,37 @@ pub(crate) fn inconfidential_assign_target_statement(
                 inconfidential_assign_target_statement(checker, element, value);
             }
         }
-        Expr::Name(_) => {
-            if let Some(result) = is_inconfidential_assign_statement(checker, target, value) {
-                // Add diagnostics
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(result, target.range()));
+        Expr::Name(target_name) => {
+            let target_label = get_variable_label_by_name(checker, target_name);
+            let value_label = get_label_for_expression(checker, value);
+
+            if let Some(value_label) = value_label {
+                if value_label.is_public() {
+                    return;
+                }
+
+                // Value is not public, check if label(target) >= label(value)
+                if let Some(target_label) = target_label {
+                    if target_label >= value_label {
+                        return;
+                    }
+
+                    // target_label < value_label
+                    checker.diagnostics.push(Diagnostic::new(
+                        IFExplicitVariableAssign {
+                            var: target_name.id.clone(),
+                            var_label: target_label,
+                            expr: checker.locator().full_lines(value.range()).to_string(),
+                            expr_label: value_label,
+                        },
+                        target.range(),
+                    ));
+                }
+
+                // No label for the target
+                // TODO?
             }
         }
         _ => {}
-    }
-}
-
-/// Check if a variable assignment has correct information flow, in terms of confidentiality.
-/// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking implicit flow)
-///
-/// I.e. the variable label is more restrictive than the value label or the same.
-fn is_inconfidential_assign_statement(
-    checker: &mut Checker,
-    target: &Expr,
-    value: &Expr,
-) -> Option<IFInconfidentialVariableAssign> {
-    // Get variable and value names
-    let Expr::Name(variable_name) = target else {
-        return None;
-    };
-
-    // TODO: Handle multiple targets
-
-    // Get labels
-    let variable_label = get_variable_label_by_name(checker, variable_name);
-    let value_label = get_label_for_expression(checker, value);
-
-    // No label for the variable or value, then it is not unauthorised
-    if variable_label.is_none() || value_label.is_none() {
-        return None;
-    }
-
-    if !variable_label
-        .as_ref()
-        .unwrap()
-        .is_higher_in_lattice_path(value_label.as_ref().unwrap())
-    {
-        return Some(IFInconfidentialVariableAssign {
-            var: variable_name.id.clone(),
-            var_label: variable_label.unwrap(),
-            expr: checker.locator().full_lines(value.range()).to_string(),
-            expr_label: value_label.unwrap(),
-        });
-    } else {
-        return None;
     }
 }

@@ -58,7 +58,7 @@ impl InformationFlowState {
 
     /// Set the current level of the information flow state.
     /// If PC is higher from before, add that instead.
-    pub(crate) fn set_pc(&mut self, pc: Label, range: TextRange) {
+    pub(crate) fn push_pc(&mut self, pc: Label, range: TextRange) {
         let current_pc = self.get_pc_label();
         if current_pc > pc {
             self.pc.push_front(PC {
@@ -89,8 +89,20 @@ impl InformationFlowState {
         range: TextRange,
         locator: &Locator,
         comment_ranges: &CommentRanges,
+        binding_label: Option<Label>,
     ) {
-        // Add to variable_map
+
+        // Check for label from shadowed bindings
+        // TODO: Implement inheritance from shadowed bindings
+        // TODO: Declassification (invalid declassification check?)
+
+        // Use the label if it is provided
+        if let Some(label) = binding_label {
+            self.variable_map.insert(binding_id, label);
+            return;
+        }
+
+        // Read from comment
         if let Some((label, ..)) = read_variable_label_from_source(range, locator, comment_ranges) {
             self.variable_map.insert(binding_id, label);
         } else {
@@ -185,6 +197,7 @@ c = 3
                             range,
                             &locator,
                             comment_ranges,
+                            None,
                         );
                     }
                 }
@@ -253,6 +266,7 @@ a = 1
                                 range,
                                 &locator,
                                 comment_ranges,
+                                None,
                             );
                         }
                         _ => {}
@@ -299,6 +313,7 @@ b = 2 # iflabel {}
                             range,
                             &locator,
                             comment_ranges,
+                            None,
                         );
                     }
                 }

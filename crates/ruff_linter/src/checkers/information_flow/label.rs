@@ -11,6 +11,7 @@ lazy_static! {
 pub(crate) struct Label {
     pub(crate) principals: Vec<String>,
 }
+
 impl Label {
     #[allow(dead_code)]
     pub(crate) fn new(principals: Vec<String>) -> Self {
@@ -64,6 +65,10 @@ impl Label {
     }
 }
 
+/// Note that this not strictly the total order. Instead it counts as the sqsubseteq relation
+/// This means that if a label is higher in the lattice, then it is greater than the other label
+/// Furthemore if the other label is in another branch of the lattice, we handle it as if it is greater (i.e. not compatible)
+/// Check the [`Label::is_higher_in_lattice_path`] function for more details
 impl PartialOrd for Label {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self == other {

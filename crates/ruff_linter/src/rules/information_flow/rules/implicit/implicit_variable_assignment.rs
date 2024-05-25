@@ -31,14 +31,14 @@ use crate::checkers::{
 ///
 /// ```
 #[violation]
-pub struct IFImplicitInconfidentialVariableAssign {
+pub struct IFImplicitVariableAssign {
     target: String,
     target_label: Label,
     pc_expr: String,
     pc: Label,
 }
 
-impl Violation for IFImplicitInconfidentialVariableAssign {
+impl Violation for IFImplicitVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("")
@@ -91,7 +91,7 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
                 if pc > target_label {
                     let pc_expr_range = checker.information_flow().get_pc_expr_range();
                     checker.diagnostics.push(Diagnostic::new(
-                        IFImplicitInconfidentialVariableAssign {
+                        IFImplicitVariableAssign {
                             target: name_target.id.clone(),
                             target_label,
                             pc_expr: checker.locator().slice(pc_expr_range).to_string(),

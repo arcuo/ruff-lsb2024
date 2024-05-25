@@ -10,6 +10,3 @@ while secret_var < 10:
     secret_var += 1 # Success
     while public_var < 10: # Nested while does not decrease the pc {secret}
         public_var += 1 # Fail
-
-
-# TODO for loop
