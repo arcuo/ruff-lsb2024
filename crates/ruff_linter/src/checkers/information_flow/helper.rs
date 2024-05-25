@@ -166,7 +166,7 @@ pub(crate) fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Op
         Expr::ListComp(_) => None, // TODO: Handle list comprehensions
         Expr::SetComp(_) => None,  // TODO: Handle set comprehensions
         Expr::DictComp(_) => None, // TODO: Handle dict comprehensions
-        Expr::Generator(_) => todo!(),
+        Expr::Generator(_) => None,
 
         // Functions
         Expr::Call(_) => None,   // TODO: Handle call expressions
@@ -175,8 +175,8 @@ pub(crate) fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Op
 
         Expr::YieldFrom(_) | Expr::Yield(_) => None, // TODO: Handle yield expressions if needed
 
-        Expr::FString(_) => todo!(),
-        Expr::Starred(_) => todo!(), // TODO: Handle starred expressions
+        Expr::FString(_) => None,
+        Expr::Starred(_) => None, // TODO: Handle starred expressions
 
         Expr::IpyEscapeCommand(_) => None, // We dont support ipython escape commands (Jupyter)
 

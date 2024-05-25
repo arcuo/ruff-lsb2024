@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
-assertion_line: 29
 ---
 IF201_assert.py:10:1: IF201 
    |

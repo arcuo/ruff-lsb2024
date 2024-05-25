@@ -75,10 +75,6 @@ impl InformationFlowState {
         self.pc.pop_front();
     }
 
-    pub(crate) fn variable_map(&self) -> &FxHashMap<BindingId, Label> {
-        &self.variable_map
-    }
-
     pub(crate) fn get_label(&self, binding_id: BindingId) -> Option<Label> {
         return self.variable_map.get(&binding_id).cloned();
     }
@@ -91,7 +87,6 @@ impl InformationFlowState {
         comment_ranges: &CommentRanges,
         binding_label: Option<Label>,
     ) {
-
         // Check for label from shadowed bindings
         // TODO: Implement inheritance from shadowed bindings
         // TODO: Declassification (invalid declassification check?)

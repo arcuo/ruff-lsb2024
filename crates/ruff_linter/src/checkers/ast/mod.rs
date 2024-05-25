@@ -70,7 +70,6 @@ use crate::{docstrings, noqa};
 
 use super::information_flow::helper::get_label_for_expression;
 use super::information_flow::information_flow_state::InformationFlowState;
-use super::information_flow::label::Label;
 
 mod analyze;
 mod annotation;
@@ -925,21 +924,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(orelse);
                 self.information_flow.pop_pc();
             }
-            Stmt::For(ast::StmtFor {
-                range: _,
-                is_async: _,
-                target,
-                iter,
-                body,
-                orelse,
-            }) => {
+            Stmt::For(ast::StmtFor { iter, .. }) => {
                 // For information flow, handle block PC (Implicit)
                 if let Some(label) = get_label_for_expression(self, iter) {
                     self.information_flow.push_pc(label.clone(), iter.range());
                 }
 
-                self.visit_body(body);
-                self.visit_body(orelse);
+                visitor::walk_stmt(self, stmt);
 
                 // For information flow, pop block PC
                 self.information_flow.pop_pc();
