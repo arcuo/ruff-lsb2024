@@ -22,7 +22,7 @@ mod tests {
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201_if.py"))]
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201_while.py"))]
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201_for.py"))]
-    #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201_combine.py"))]
+    #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201_nested.py"))]
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201_assert.py"))]
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
