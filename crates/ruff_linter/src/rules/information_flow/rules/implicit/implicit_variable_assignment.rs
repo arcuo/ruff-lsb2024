@@ -4,6 +4,8 @@ use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCompare, ExprDict, ExprIf, ExprList,
     ExprName, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
+use ruff_source_file::OneIndexed;
+use ruff_text_size::TextRange;
 
 use crate::checkers::{
     ast::Checker,
@@ -34,14 +36,14 @@ use crate::checkers::{
 pub struct IFImplicitVariableAssign {
     target: String,
     target_label: Label,
-    pc_expr: String,
+    pc_expr_line_number: OneIndexed,
     pc: Label,
 }
 
 impl Violation for IFImplicitVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("")
+        format!("Illegal implicit information flow. Current pc label: {} is greater than target label: {}. Current pc set at line {}", self.pc.to_string(), self.target_label.to_string(), self.pc_expr_line_number)
     }
 }
 
@@ -94,7 +96,9 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
                         IFImplicitVariableAssign {
                             target: name_target.id.clone(),
                             target_label,
-                            pc_expr: checker.locator().slice(pc_expr_range).to_string(),
+                            pc_expr_line_number: checker
+                                .locator()
+                                .compute_line_index(pc_expr_range.start()),
                             pc,
                         },
                         target.range(),
