@@ -5,9 +5,13 @@ use ruff_python_ast::{
     ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
 
-use crate::checkers::{ast::Checker, information_flow::label::Label};
-
-use super::helpers::get_variable_label_by_name;
+use crate::checkers::{
+    ast::Checker,
+    information_flow::{
+        helper::{get_label_for_expression, get_variable_label_by_name},
+        label::Label,
+    },
+};
 
 /// ## What it does
 /// Check confidentiality of information flow in variable assignments.
@@ -25,14 +29,14 @@ use super::helpers::get_variable_label_by_name;
 /// public_var = secret_var  # Label violation as {secret} -> {} is not allowed
 /// ```
 #[violation]
-pub struct IFInconfidentialVariableAssign {
+pub struct IFExplicitVariableAssign {
     var: String,
     var_label: Label,
     expr: String,
     expr_label: Label,
 }
 
-impl Violation for IFInconfidentialVariableAssign {
+impl Violation for IFExplicitVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -55,6 +59,7 @@ pub(crate) fn inconfidential_assign_targets_statement(
 }
 
 /// IF101
+/// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking implicit flow)
 pub(crate) fn inconfidential_assign_target_statement(
     checker: &mut Checker,
     target: &Expr,
@@ -66,12 +71,35 @@ pub(crate) fn inconfidential_assign_target_statement(
                 inconfidential_assign_target_statement(checker, element, value);
             }
         }
-        Expr::Name(_) => {
-            if let Some(result) = is_inconfidential_assign_statement(checker, target, value) {
-                // Add diagnostics
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(result, target.range()));
+        Expr::Name(target_name) => {
+            let target_label = get_variable_label_by_name(checker, target_name);
+            let value_label = get_label_for_expression(checker, value);
+
+            if let Some(value_label) = value_label {
+                if value_label.is_public() {
+                    return;
+                }
+
+                // Value is not public, check if label(target) >= label(value)
+                if let Some(target_label) = target_label {
+                    if target_label >= value_label {
+                        return;
+                    }
+
+                    // target_label < value_label
+                    checker.diagnostics.push(Diagnostic::new(
+                        IFExplicitVariableAssign {
+                            var: target_name.id.clone(),
+                            var_label: target_label,
+                            expr: checker.locator().full_lines(value.range()).to_string(),
+                            expr_label: value_label,
+                        },
+                        target.range(),
+                    ));
+                }
+
+                // No label for the target
+                // TODO?
             }
         }
         _ => {}

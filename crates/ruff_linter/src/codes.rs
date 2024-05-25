@@ -334,6 +334,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
         (Flake8Async, "101") => (RuleGroup::Stable, rules::flake8_async::rules::OpenSleepOrSubprocessInAsyncFunction),
         (Flake8Async, "102") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingOsCallInAsyncFunction),
+        (Flake8Async, "116") => (RuleGroup::Preview, rules::flake8_async::rules::SleepForeverCall),
 
         // flake8-trio
         (Flake8Trio, "100") => (RuleGroup::Stable, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
@@ -1093,9 +1094,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (InformationFlow, "002") => (RuleGroup::Stable, rules::information_flow::rules::IFMissingPrincipal),
 
         // Information flow explicit rules (IF101-...)
-        (InformationFlow, "101") => (RuleGroup::Stable, rules::information_flow::rules::IFInconfidentialVariableAssign),
-
+        (InformationFlow, "101") => (RuleGroup::Stable, rules::information_flow::rules::IFExplicitVariableAssign),
+        
         // Information flow implicit rules (IF201-...)
+        (InformationFlow, "201") => (RuleGroup::Stable, rules::information_flow::rules::IFImplicitVariableAssign),
 
         _ => return None,
     })

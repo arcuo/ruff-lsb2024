@@ -6,7 +6,6 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::types::Node;
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -62,6 +61,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py39
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                     && typing::is_pep585_generic(value, &checker.semantic)
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
@@ -505,6 +506,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::BlockingOsCallInAsyncFunction) {
                 flake8_async::rules::blocking_os_call(checker, call);
+            }
+            if checker.enabled(Rule::SleepForeverCall) {
+                flake8_async::rules::sleep_forever_call(checker, call);
             }
             if checker.any_enabled(&[Rule::Print, Rule::PPrint]) {
                 flake8_print::rules::print_call(checker, call);
@@ -1065,13 +1069,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyflakes::rules::invalid_print_syntax(checker, left);
             }
         }
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: Operator::Mod,
-            right,
-            range: _,
-        }) => {
-            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = left.as_ref() {
+        Expr::BinOp(
+            bin_op @ ast::ExprBinOp {
+                left,
+                op: Operator::Mod,
+                right,
+                range: _,
+            },
+        ) => {
+            if let Expr::StringLiteral(format_string @ ast::ExprStringLiteral { value, .. }) =
+                left.as_ref()
+            {
                 if checker.any_enabled(&[
                     Rule::PercentFormatInvalidFormat,
                     Rule::PercentFormatExpectedMapping,
@@ -1151,10 +1159,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     pyupgrade::rules::printf_string_formatting(checker, expr, right);
                 }
                 if checker.enabled(Rule::BadStringFormatCharacter) {
-                    pylint::rules::bad_string_format_character::percent(checker, expr);
+                    pylint::rules::bad_string_format_character::percent(
+                        checker,
+                        expr,
+                        format_string,
+                    );
                 }
                 if checker.enabled(Rule::BadStringFormatType) {
-                    pylint::rules::bad_string_format_type(checker, expr, right);
+                    pylint::rules::bad_string_format_type(checker, bin_op, format_string);
                 }
                 if checker.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
@@ -1187,6 +1199,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if !checker.semantic.future_annotations_or_stub()
                     && checker.settings.target_version < PythonVersion::Py310
                     && checker.semantic.in_annotation()
+                    && checker.semantic.in_runtime_evaluated_annotation()
+                    && !checker.semantic.in_string_type_definition()
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
                         checker,

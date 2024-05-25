@@ -5,15 +5,12 @@ use ruff_python_ast::{Expr, ExprName, ExprTuple};
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::{
-    checkers::{
-        ast::Checker,
-        information_flow::{
-            information_flow_state::read_variable_label_from_source, label::Label,
-            principals::Principals,
-        },
+use crate::checkers::{
+    ast::Checker,
+    information_flow::{
+        information_flow_state::read_variable_label_from_source, label::Label,
+        principals::Principals,
     },
-    rules::information_flow::rules::helpers::get_variable_label_by_name,
 };
 
 /// ## What it does

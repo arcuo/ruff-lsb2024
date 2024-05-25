@@ -14,6 +14,7 @@ lazy_static! {
 pub(crate) struct Label {
     pub(crate) principals: Vec<String>,
 }
+
 impl Label {
     #[allow(dead_code)]
     pub(crate) fn new(principals: Vec<String>) -> Self {
@@ -38,12 +39,13 @@ impl Label {
     }
 
     /// Check labels direction conversion i.e. you can move down in the lattice, not up
-    ///
+    /// ```latex
     ///       AB
     ///      / \
     ///     A   B
     ///      \ /
     ///       0
+    /// ```
     pub(crate) fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
         // If the test label is public, then it is never more restrictive
         if label.is_public() {
@@ -84,6 +86,24 @@ impl FunctionLabel {
         format!("{{ {} }} {{{}}}", argument_labels, self.return_label.to_string())
     }
 }
+/// Note that this not strictly the total order. Instead it counts as the sqsubseteq relation
+/// This means that if a label is higher in the lattice, then it is greater than the other label
+/// Furthemore if the other label is in another branch of the lattice, we handle it as if it is greater (i.e. not compatible)
+/// Check the [`Label::is_higher_in_lattice_path`] function for more details
+impl PartialOrd for Label {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self == other {
+            return Some(std::cmp::Ordering::Equal);
+        }
+
+        if self.is_higher_in_lattice_path(other) {
+            return Some(std::cmp::Ordering::Greater);
+        } else {
+            return Some(std::cmp::Ordering::Less);
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct LabelParseError;
 

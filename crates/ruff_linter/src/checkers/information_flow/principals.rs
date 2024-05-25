@@ -80,11 +80,8 @@ impl ToString for Principals {
 
 impl FromStr for Principals {
     /// Parses a string of principals e.g. from a comment
-    /// ```
-    /// ifprincipals {
-    ///   alice,
-    ///   bob
-    /// }
+    /// ```python
+    /// # ifprincipals { alice, bob }
     /// ```
     ///
     /// into the Principals struct with the principals `['alice', 'bob']`

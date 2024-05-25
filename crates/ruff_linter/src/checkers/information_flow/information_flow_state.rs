@@ -13,6 +13,14 @@ use super::{
     principals::{initiate_principals, Principals},
 };
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct PC {
+    /// The current PC label
+    label: Label,
+    /// The range of the statement where the PC is set
+    range: TextRange,
+}
+
 /// State of the information flow
 #[derive()]
 pub(crate) struct InformationFlowState {
@@ -20,7 +28,7 @@ pub(crate) struct InformationFlowState {
     #[allow(dead_code)]
     principals: Principals,
     // The current scope level queue. The level is updated according to the scope by popping and
-    pc: VecDeque<String>,
+    pc: VecDeque<PC>,
     // Map from variable name to
     variable_map: FxHashMap<BindingId, Label>,
     // Map from function name to parameter label
@@ -38,15 +46,37 @@ impl InformationFlowState {
     }
 
     /// Return the current level of the information flow state
-    pub(crate) fn pc(&self) -> String {
+    pub(crate) fn get_pc_label(&self) -> Label {
         return match self.pc.front() {
-            Some(pc) => pc.clone(),
-            None => String::new(),
+            Some(pc) => pc.label.clone(),
+            None => Label::new_public(), // TODO: Should this be public by default?
         };
     }
 
-    pub(crate) fn variable_map(&self) -> &FxHashMap<BindingId, Label> {
-        &self.variable_map
+    pub(crate) fn get_pc_expr_range(&self) -> TextRange {
+        return match self.pc.front() {
+            Some(pc) => pc.range.clone(),
+            None => TextRange::default(),
+        };
+    }
+
+    /// Set the current level of the information flow state.
+    /// If PC is higher from before, add that instead.
+    pub(crate) fn push_pc(&mut self, pc: Label, range: TextRange) {
+        let current_pc = self.get_pc_label();
+        if current_pc > pc {
+            self.pc.push_front(PC {
+                label: current_pc,
+                range: self.get_pc_expr_range(),
+            });
+        } else {
+            self.pc.push_front(PC { label: pc, range });
+        }
+    }
+
+    /// Pop the current level of the information flow state
+    pub(crate) fn pop_pc(&mut self) {
+        self.pc.pop_front();
     }
 
     pub(crate) fn get_label(&self, binding_id: BindingId) -> Option<Label> {
@@ -95,100 +125,24 @@ impl InformationFlowState {
         range: TextRange,
         locator: &Locator,
         comment_ranges: &CommentRanges,
-        binding_kind: &BindingKind,
-        parameter_name: &str,
+        binding_label: Option<Label>,
     ) {
-        // Add to variable_map
-        let line_range = locator.line_range(range.start());
-        let label_comment = comment_ranges.comments_in_range(line_range).first();
+        // Check for label from shadowed bindings
+        // TODO: Implement inheritance from shadowed bindings
+        // TODO: Declassification (invalid declassification check?)
 
-        // Match on the binding kind
-        match binding_kind {
-            BindingKind::Assignment => {
-                if let Some(comment) = label_comment {
-                    let comment_text: &str = &locator.slice(comment).replace('#', "");
-                    if let Ok(label) = comment_text.parse::<Label>() {
-                        self.variable_map.insert(binding_id, label);
-                    }
-                } else {
-                    let label_comment =
-                        if let Some(previous_line) = Self::get_previous_line(locator, range) {
-                            comment_ranges
-                                .comments_in_range(previous_line) // Previous line
-                                .first()
-                        } else {
-                            None
-                        };
+        // Use the label if it is provided
+        if let Some(label) = binding_label {
+            self.variable_map.insert(binding_id, label);
+            return;
+        }
 
-                    if let Some(comment) = label_comment {
-                        let comment_text: &str = &locator.slice(comment).replace('#', "");
-                        if let Ok(label) = comment_text.parse::<Label>() {
-                            self.variable_map.insert(binding_id, label);
-                        }
-                    } else {
-                        // No label comment, add public label
-                        self.variable_map.insert(binding_id, Label::new_public());
-                    }
-                }
-            }
-            BindingKind::FunctionDefinition(_) => {
-                let label_comment =
-                    if let Some(previous_line) = Self::get_previous_line(locator, range) {
-                        comment_ranges
-                            .comments_in_range(previous_line) // Previous line
-                            .first()
-                    } else {
-                        None
-                    };
-
-                if let Some(comment) = label_comment {
-                    let comment_text: &str = &locator.slice(comment).replace('#', "");
-                    if let Ok(label) = comment_text.parse::<FunctionLabel>() {
-                        let parameter_index = 0;
-                        for argument_label in label.argument_labels {
-                            // Insert the argument labels in the order into the function parameter map
-                            self.function_parameter_map
-                                .entry(binding_id)
-                                .or_insert_with(FxHashMap::default)
-                                .insert(parameter_index.to_string(), argument_label.clone());
-                        }
-                        self.variable_map.insert(binding_id, label.return_label);
-                    }
-                } else {
-                    // No return label comment, add public label
-                    self.variable_map.insert(binding_id, Label::new_public());
-                }
-            }
-            BindingKind::Argument => {
-                // Find the label from the function parameter map and then insert it into the
-                // variable map with the binding id
-                if !parameter_name.is_empty() {
-                    if let Some(labels) = self.function_parameter_map.get(&binding_id) {
-                        if let Some(label) = labels.get(parameter_name) {
-                            self.variable_map.insert(binding_id, label.clone());
-                        }
-                    }
-                }
-            }
-            BindingKind::Annotation => todo!(),
-            BindingKind::NamedExprAssignment => todo!(),
-            BindingKind::TypeParam => todo!(),
-            BindingKind::LoopVar => todo!(),
-            BindingKind::ComprehensionVar => todo!(),
-            BindingKind::WithItemVar => todo!(),
-            BindingKind::Global => todo!(),
-            BindingKind::Nonlocal(_) => todo!(),
-            BindingKind::Builtin => todo!(),
-            BindingKind::ClassDefinition(_) => todo!(),
-            BindingKind::Export(_) => todo!(),
-            BindingKind::FutureImport => todo!(),
-            BindingKind::Import(_) => todo!(),
-            BindingKind::FromImport(_) => todo!(),
-            BindingKind::SubmoduleImport(_) => todo!(),
-            BindingKind::Deletion => todo!(),
-            BindingKind::ConditionalDeletion(_) => todo!(),
-            BindingKind::BoundException => todo!(),
-            BindingKind::UnboundException(_) => todo!(),
+        // Read from comment
+        if let Some((label, ..)) = read_variable_label_from_source(range, locator, comment_ranges) {
+            self.variable_map.insert(binding_id, label);
+        } else {
+            // No label comment, add public label
+            self.variable_map.insert(binding_id, Label::new_public());
         }
     }
 

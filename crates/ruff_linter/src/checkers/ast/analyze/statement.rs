@@ -2,7 +2,6 @@ use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Node;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
 
@@ -1082,9 +1081,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, value, .. }) => {
-            if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+            if checker.enabled(Rule::IFExplicitVariableAssign) {
                 information_flow::rules::inconfidential_assign_target_statement(
                     checker, &target, &value,
+                );
+            }
+            if checker.enabled(Rule::IFImplicitVariableAssign) {
+                information_flow::rules::implicit_inconfidential_assign_target_statement(
+                    checker, &target,
                 );
             }
             if checker.enabled(Rule::SelfOrClsAssignment) {
@@ -1104,9 +1108,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::too_many_nested_blocks(checker, stmt);
             }
             if checker.enabled(Rule::EmptyTypeCheckingBlock) {
-                if typing::is_type_checking_block(if_, &checker.semantic) {
-                    flake8_type_checking::rules::empty_type_checking_block(checker, if_);
-                }
+                flake8_type_checking::rules::empty_type_checking_block(checker, if_);
             }
             if checker.enabled(Rule::IfTuple) {
                 pyflakes::rules::if_tuple(checker, if_);
@@ -1452,11 +1454,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 ..
             },
         ) => {
-            if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+            if checker.enabled(Rule::IFExplicitVariableAssign) {
                 information_flow::rules::inconfidential_assign_targets_statement(
                     checker,
                     &assign.targets,
                     &assign.value,
+                );
+            }
+            if checker.enabled(Rule::IFImplicitVariableAssign) {
+                information_flow::rules::implicit_inconfidential_assign_targets_statement(
+                    checker,
+                    &assign.targets,
                 );
             }
             if checker.enabled(Rule::IFMustIncludeVariableLabel) {
@@ -1613,9 +1621,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                     );
                 }
-                if checker.enabled(Rule::IFInconfidentialVariableAssign) {
+                if checker.enabled(Rule::IFExplicitVariableAssign) {
                     information_flow::rules::inconfidential_assign_target_statement(
                         checker, &target, value,
+                    );
+                }
+                if checker.enabled(Rule::IFImplicitVariableAssign) {
+                    information_flow::rules::implicit_inconfidential_assign_target_statement(
+                        checker, &target,
                     );
                 }
                 if checker.enabled(Rule::IFMustIncludeVariableLabel) {

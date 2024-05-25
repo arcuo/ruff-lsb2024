@@ -49,7 +49,7 @@ use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_semantic::all::{extract_all_names, DunderAllDefinition, DunderAllFlags};
+use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
@@ -68,6 +68,7 @@ use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
+use super::information_flow::helper::get_label_for_expression;
 use super::information_flow::information_flow_state::InformationFlowState;
 
 mod analyze;
@@ -75,7 +76,7 @@ mod annotation;
 mod deferred;
 
 /// State representing whether a docstring is expected or not for the next statement.
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum DocstringState {
     /// The next statement is expected to be a docstring, but not necessarily so.
     ///
@@ -94,15 +95,84 @@ enum DocstringState {
     /// For `Foo`, the state is expected when the checker is visiting the class
     /// body but isn't going to be present. While, for `bar` function, the docstring
     /// is expected and present.
-    #[default]
-    Expected,
+    Expected(ExpectedDocstringKind),
     Other,
 }
 
+impl Default for DocstringState {
+    /// Returns the default docstring state which is to expect a module-level docstring.
+    fn default() -> Self {
+        Self::Expected(ExpectedDocstringKind::Module)
+    }
+}
+
 impl DocstringState {
-    /// Returns `true` if the next statement is expected to be a docstring.
-    const fn is_expected(self) -> bool {
-        matches!(self, DocstringState::Expected)
+    /// Returns the docstring kind if the state is expecting a docstring.
+    const fn expected_kind(self) -> Option<ExpectedDocstringKind> {
+        match self {
+            DocstringState::Expected(kind) => Some(kind),
+            DocstringState::Other => None,
+        }
+    }
+}
+
+/// The kind of an expected docstring.
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum ExpectedDocstringKind {
+    /// A module-level docstring.
+    ///
+    /// For example,
+    /// ```python
+    /// """This is a module-level docstring."""
+    ///
+    /// a = 1
+    /// ```
+    Module,
+
+    /// A class-level docstring.
+    ///
+    /// For example,
+    /// ```python
+    /// class Foo:
+    ///     """This is the docstring for `Foo` class."""
+    ///
+    ///     def __init__(self) -> None:
+    ///         ...
+    /// ```
+    Class,
+
+    /// A function-level docstring.
+    ///
+    /// For example,
+    /// ```python
+    /// def foo():
+    ///     """This is the docstring for `foo` function."""
+    ///     pass
+    /// ```
+    Function,
+
+    /// An attribute-level docstring.
+    ///
+    /// For example,
+    /// ```python
+    /// a = 1
+    /// """This is the docstring for `a` variable."""
+    ///
+    ///
+    /// class Foo:
+    ///     b = 1
+    ///     """This is the docstring for `Foo.b` class variable."""
+    /// ```
+    Attribute,
+}
+
+impl ExpectedDocstringKind {
+    /// Returns the semantic model flag that represents the current docstring state.
+    const fn as_flag(self) -> SemanticModelFlags {
+        match self {
+            ExpectedDocstringKind::Attribute => SemanticModelFlags::ATTRIBUTE_DOCSTRING,
+            _ => SemanticModelFlags::PEP_257_DOCSTRING,
+        }
     }
 }
 
@@ -393,9 +463,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Update the semantic model if it is in a docstring. This should be done after the
         // flags snapshot to ensure that it gets reset once the statement is analyzed.
-        if self.docstring_state.is_expected() {
+        if let Some(kind) = self.docstring_state.expected_kind() {
             if is_docstring_stmt(stmt) {
-                self.semantic.flags |= SemanticModelFlags::DOCSTRING;
+                self.semantic.flags |= kind.as_flag();
             }
             // Reset the state irrespective of whether the statement is a docstring or not.
             self.docstring_state = DocstringState::Other;
@@ -602,7 +672,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     AnnotationContext::from_function(function_def, &self.semantic, self.settings);
 
                 // The first parameter may be a single dispatch.
-                let mut singledispatch =
+                let singledispatch =
                     flake8_type_checking::helpers::is_singledispatch_implementation(
                         function_def,
                         self.semantic(),
@@ -618,7 +688,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
                             self.visit_runtime_required_annotation(expr);
-                            singledispatch = false;
                         } else {
                             match annotation {
                                 AnnotationContext::RuntimeRequired => {
@@ -726,7 +795,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 // Set the docstring state before visiting the class body.
-                self.docstring_state = DocstringState::Expected;
+                self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Class);
                 self.visit_body(body);
 
                 let scope_id = self.semantic.scope_id;
@@ -860,6 +929,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_boolean_test(test);
                 self.visit_body(body);
                 self.visit_body(orelse);
+                self.information_flow.pop_pc();
+            }
+            Stmt::For(ast::StmtFor { iter, .. }) => {
+                // For information flow, handle block PC (Implicit)
+                if let Some(label) = get_label_for_expression(self, iter) {
+                    self.information_flow.push_pc(label.clone(), iter.range());
+                }
+
+                visitor::walk_stmt(self, stmt);
+
+                // For information flow, pop block PC
+                self.information_flow.pop_pc();
             }
             Stmt::If(
                 stmt_if @ ast::StmtIf {
@@ -886,10 +967,31 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.semantic.push_branch();
                     self.visit_elif_else_clause(clause);
                     self.semantic.pop_branch();
+                    self.information_flow.pop_pc();
                 }
+
+                self.information_flow.pop_pc();
             }
             _ => visitor::walk_stmt(self, stmt),
         };
+
+        if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
+            match stmt {
+                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                    if let [Expr::Name(_)] = targets.as_slice() {
+                        self.docstring_state =
+                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
+                    }
+                }
+                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+                    if target.is_name_expr() {
+                        self.docstring_state =
+                            DocstringState::Expected(ExpectedDocstringKind::Attribute);
+                    }
+                }
+                _ => {}
+            }
+        }
 
         // Step 3: Clean-up
 
@@ -1714,6 +1816,11 @@ impl<'a> Checker<'a> {
         self.semantic.flags |= SemanticModelFlags::BOOLEAN_TEST;
         self.visit_expr(expr);
         self.semantic.flags = snapshot;
+
+        // Get label of the statement and add to information_flow.pc
+        if let Some(label) = get_label_for_expression(self, expr) {
+            self.information_flow.push_pc(label, expr.range());
+        }
     }
 
     /// Visit an [`ElifElseClause`]
@@ -1807,6 +1914,20 @@ impl<'a> Checker<'a> {
             self.semantic
                 .shadowed_bindings
                 .insert(binding_id, shadowed_id);
+        } else {
+            // No shadowed binding, so this is a new binding.
+            // Add variable label to information flow
+
+            // TODO: Add check for is information flow is enabled
+            // TODO: Inherit binding from value
+            // TODO: Are there times when we can skip this?
+            self.information_flow.add_variable_label_binding(
+                binding_id,
+                range,
+                self.locator(),
+                self.indexer().comment_ranges(),
+                None,
+            );
         }
 
         // Add the binding to the scope.
@@ -1912,8 +2033,7 @@ impl<'a> Checker<'a> {
                 _ => false,
             }
         {
-            let (all_names, all_flags) =
-                extract_all_names(parent, |name| self.semantic.has_builtin_binding(name));
+            let (all_names, all_flags) = self.semantic.extract_dunder_all_names(parent);
 
             if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
                 flags |= BindingFlags::INVALID_ALL_OBJECT;
@@ -2096,7 +2216,7 @@ impl<'a> Checker<'a> {
 
                     self.semantic.restore(snapshot);
 
-                    if self.semantic.in_annotation() && self.semantic.future_annotations_or_stub() {
+                    if self.semantic.in_annotation() && self.semantic.in_typing_only_annotation() {
                         if self.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
@@ -2153,7 +2273,7 @@ impl<'a> Checker<'a> {
 
                 self.visit_parameters(parameters);
                 // Set the docstring state before visiting the function body.
-                self.docstring_state = DocstringState::Expected;
+                self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);
             }
         }
