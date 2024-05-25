@@ -28,6 +28,7 @@
 
 use std::path::Path;
 
+use ast::{ExprName, ExpressionRef};
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
@@ -70,6 +71,7 @@ use crate::{docstrings, noqa};
 
 use super::information_flow::helper::get_label_for_expression;
 use super::information_flow::information_flow_state::InformationFlowState;
+use super::information_flow::label::Label;
 
 mod analyze;
 mod annotation;
@@ -928,6 +930,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 // For information flow, handle block PC (Implicit)
                 if let Some(label) = get_label_for_expression(self, iter) {
                     self.information_flow.push_pc(label.clone(), iter.range());
+
+                    // For information flow, handle variable label (Explicit)
+                    if let ExpressionRef::Name(ExprName { id, range, .. }) =
+                        ExpressionRef::from(target)
+                    {
+                        self.add_binding(
+                            id.as_str(),
+                            range.clone(),
+                            BindingKind::LoopVar,
+                            BindingFlags::empty(),
+                            // TODO: Some(label),
+                        );
+                    }
                 }
 
                 visitor::walk_stmt(self, stmt);

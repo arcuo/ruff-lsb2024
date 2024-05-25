@@ -1,0 +1,5 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 35
+---
+

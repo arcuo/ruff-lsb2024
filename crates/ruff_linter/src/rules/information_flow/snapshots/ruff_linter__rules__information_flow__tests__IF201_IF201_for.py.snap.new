@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 35
+---
+IF201_for.py:10:5: IF201 
+   |
+ 9 | for s in secret_var: # PC = {secret}
+10 |     public_var = 0 # Fail
+   |     ^^^^^^^^^^ IF201
+11 |     public_var += 1 # Fail
+12 |     public_var: int = 0 # Fail
+   |
+
+IF201_for.py:11:5: IF201 
+   |
+ 9 | for s in secret_var: # PC = {secret}
+10 |     public_var = 0 # Fail
+11 |     public_var += 1 # Fail
+   |     ^^^^^^^^^^ IF201
+12 |     public_var: int = 0 # Fail
+   |
+
+IF201_for.py:12:5: IF201 
+   |
+10 |     public_var = 0 # Fail
+11 |     public_var += 1 # Fail
+12 |     public_var: int = 0 # Fail
+   |     ^^^^^^^^^^ IF201
+13 | 
+14 |     secret_var = 0 # Success
+   |
