@@ -1,4 +1,8 @@
-use ruff_python_ast::{Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCompare, ExprDict, ExprIf, ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp};
+use ruff_python_ast::{
+    Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
+    ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
+};
+use ruff_python_semantic::BindingId;
 
 use crate::checkers::ast::Checker;
 
@@ -11,22 +15,18 @@ pub(crate) fn get_variable_label_by_name(checker: &mut Checker, name: &ExprName)
     // Get shadowed [BindingId] from [Scope] if it exists. We only have to check shadowed bindings,
     // because otherwise the variable is new and does not have a label
     if let Some(binding_id) = checker.semantic().current_scope().get(name.id.as_str()) {
-        if let Some(actual_binding_id) = checker
+        let test = binding_id;
+        let test_shadows: Vec<BindingId> = checker
             .semantic()
             .current_scope()
             .shadowed_bindings(binding_id)
-            .last()
-        {
-            // Get [Label] from information_flow
-            if let Some(label) = checker.information_flow().get_label(actual_binding_id) {
-                return Some(label);
-            }
-        } else {
-            // Get [Label] from information_flow
-            if let Some(label) = checker.information_flow().get_label(binding_id) {
-                return Some(label);
-            }
-        }
+            .collect();
+
+        return checker
+            .semantic()
+            .current_scope()
+            .shadowed_bindings(binding_id)
+            .find_map(|bid| checker.information_flow().get_label(bid));
     }
 
     None
@@ -169,7 +169,7 @@ pub(crate) fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Op
         Expr::Generator(_) => None,
 
         // Functions
-        Expr::Call(_) => None,   // TODO: Handle call expressions
+        Expr::Call(ExprCall { func, .. }) => get_label_for_expression(checker, func),
         Expr::Lambda(_) => None, // TODO: Handle lambda expressions
         Expr::Await(ExprAwait { value, .. }) => get_label_for_expression(checker, value), // Will go to the function expressions
 

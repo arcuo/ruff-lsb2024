@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 37
+---
+IF101.py:21:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `alice_bob_var` with label `{bob}`
+   |
+20 | # IF101: Fail - public var are less restrictive than alice_bob_var
+21 | public_var = alice_bob_var
+   | ^^^^^^^^^^ IF101
+22 | 
+23 | # IF101: Fail - public var are less restrictive than bob_var
+   |
+
+IF101.py:24:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `bob_var` with label `{alice, bob}`
+   |
+23 | # IF101: Fail - public var are less restrictive than bob_var
+24 | public_var = bob_var
+   | ^^^^^^^^^^ IF101
+25 | 
+26 | # IF101: Success - Public variables can flow to more restrictive variables
+   |
+
+IF101.py:97:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{bob}` is being assigned to `[1, 2, bob_var]` with label `{alice, bob}`
+   |
+96 | # IF101: Fail - Information flow from {bob} to {public}
+97 | public_var = [1, 2, bob_var]
+   | ^^^^^^^^^^ IF101
+98 | 
+99 | # Tuple assignment
+   |
+
+IF101.py:108:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{bob}` is being assigned to `(1, 2, bob_var)` with label `{alice, bob}`
+    |
+107 | # IF101: Fail - Information flow from {bob} to {public}
+108 | public_var = (1, 2, bob_var)
+    | ^^^^^^^^^^ IF101
+109 | 
+110 | # Set assignment
+    |
+
+IF101.py:119:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{bob}` is being assigned to `{1, 2, bob_var}` with label `{alice, bob}`
+    |
+118 | # IF101: Fail - Information flow from {bob} to {public}
+119 | public_var = {1, 2, bob_var}
+    | ^^^^^^^^^^ IF101
+120 | 
+121 | # Dict assignment
+    |
+
+IF101.py:130:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{bob}` is being assigned to `{1: 2, 3: bob_var}` with label `{alice, bob}`
+    |
+129 | # IF101: Fail - Information flow from {bob} to {public}
+130 | public_var = {1: 2, 3: bob_var}
+    | ^^^^^^^^^^ IF101
+131 | 
+132 | ## TODO: var = func() Might be a separate rule
+    |

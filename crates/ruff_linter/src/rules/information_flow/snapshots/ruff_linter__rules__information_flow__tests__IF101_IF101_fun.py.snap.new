@@ -1,5 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
-assertion_line: 35
+assertion_line: 37
 ---
-
+IF101_fun.py:20:1: IF101 Illegal explicit assignment to more restrictive variable. Target `secret` with label `{}` is being assigned to `help(secret, public)` with label `{bob}`
+   |
+18 | # Checking return
+19 | # secret = help(secret, public) # OK
+20 | secret = help(secret, public) # Fail public cannot be assigned a secret return value from help
+   | ^^^^^^ IF101
+   |

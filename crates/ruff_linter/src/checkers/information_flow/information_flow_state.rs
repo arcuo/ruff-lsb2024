@@ -112,9 +112,6 @@ impl InformationFlowState {
                 return;
             }
         }
-
-        // No label comment, add public label
-        self.variable_map.insert(binding_id, Label::new_public());
     }
 
     pub(crate) fn add_function_variable_label_binding(

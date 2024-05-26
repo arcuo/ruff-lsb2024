@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 43
+---
+IF101_var.py:14:1: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `alice_bob_var` with label `{alice, bob}`
+   |
+13 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+14 | bob_var = alice_bob_var
+   | ^^^^^^^ IF101
+15 | 
+16 | # IF101: Fail - public var are less restrictive than alice_bob_var
+   |
+
+IF101_var.py:17:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `alice_bob_var` with label `{alice, bob}`
+   |
+16 | # IF101: Fail - public var are less restrictive than alice_bob_var
+17 | public_var = alice_bob_var
+   | ^^^^^^^^^^ IF101
+18 | 
+19 | # IF101: Fail - public var are less restrictive than bob_var
+   |
+
+IF101_var.py:20:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `bob_var` with label `{bob}`
+   |
+19 | # IF101: Fail - public var are less restrictive than bob_var
+20 | public_var = bob_var
+   | ^^^^^^^^^^ IF101
+21 | 
+22 | # IF101: Success - Public variables can flow to more restrictive variables
+   |

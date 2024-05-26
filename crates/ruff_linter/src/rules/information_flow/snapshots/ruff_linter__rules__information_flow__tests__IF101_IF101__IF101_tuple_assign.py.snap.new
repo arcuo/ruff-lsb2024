@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 43
+---
+IF101_tuple_assign.py:16:16: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `1, alice_bob_var` with label `{alice, bob}`
+   |
+15 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+16 | alice_bob_var, bob_var = 1, alice_bob_var
+   |                ^^^^^^^ IF101
+17 | alice_bob_var, bob_var = alice_bob_var
+   |
+
+IF101_tuple_assign.py:17:16: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `alice_bob_var` with label `{alice, bob}`
+   |
+15 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+16 | alice_bob_var, bob_var = 1, alice_bob_var
+17 | alice_bob_var, bob_var = alice_bob_var
+   |                ^^^^^^^ IF101
+   |

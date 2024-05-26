@@ -30,8 +30,8 @@ use crate::checkers::{
 /// ```
 #[violation]
 pub struct IFExplicitVariableAssign {
-    var: String,
-    var_label: Label,
+    target: String,
+    target_label: Label,
     expr: String,
     expr_label: Label,
 }
@@ -40,8 +40,8 @@ impl Violation for IFExplicitVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Inconfidential assignment to more restrictive variable. Expression `{}` with label `{}` is being assigned to `{}` with label `{}`",
-            self.var, self.var_label.to_string(), self.expr, self.expr_label.to_string()
+            "Illegal explicit assignment to more restrictive variable. Target `{}` with label `{}` is being assigned to `{}` with label `{}`",
+            self.target, self.target_label.to_string(), self.expr, self.expr_label.to_string()
         )
     }
 }
@@ -54,13 +54,13 @@ pub(crate) fn inconfidential_assign_targets_statement(
     value: &Expr,
 ) {
     for target in targets {
-        inconfidential_assign_target_statement(checker, target, value);
+        illegal_assign_target_statement(checker, target, value);
     }
 }
 
 /// IF101
 /// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking implicit flow)
-pub(crate) fn inconfidential_assign_target_statement(
+pub(crate) fn illegal_assign_target_statement(
     checker: &mut Checker,
     target: &Expr,
     value: &Expr,
@@ -68,14 +68,13 @@ pub(crate) fn inconfidential_assign_target_statement(
     match target {
         Expr::Tuple(ExprTuple { elts, .. }) => {
             for element in elts {
-                inconfidential_assign_target_statement(checker, element, value);
+                illegal_assign_target_statement(checker, element, value);
             }
         }
         Expr::Name(target_name) => {
             let target_label = get_variable_label_by_name(checker, target_name);
-            let value_label = get_label_for_expression(checker, value);
 
-            if let Some(value_label) = value_label {
+            if let Some(value_label) = get_label_for_expression(checker, value) {
                 if value_label.is_public() {
                     return;
                 }
@@ -89,17 +88,14 @@ pub(crate) fn inconfidential_assign_target_statement(
                     // target_label < value_label
                     checker.diagnostics.push(Diagnostic::new(
                         IFExplicitVariableAssign {
-                            var: target_name.id.clone(),
-                            var_label: target_label,
-                            expr: checker.locator().full_lines(value.range()).to_string(),
+                            target: target_name.id.clone(),
+                            target_label,
+                            expr: checker.locator().slice(value.range()).to_string(),
                             expr_label: value_label,
                         },
                         target.range(),
                     ));
                 }
-
-                // No label for the target
-                // TODO?
             }
         }
         _ => {}

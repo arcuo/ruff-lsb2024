@@ -1,13 +1,14 @@
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::str::FromStr;
 
 lazy_static! {
     static ref LABEL_REGEX: Regex =
-        Regex::new(r"(iflabel)?\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
+        Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
     static ref FUNCTION_LABEL_REGEX: Regex =
-        Regex::new(r"iflabel\s+fn\s*\(\s*(?P<arg>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z]\}]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})\s*\)\s*\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)\s*\}").unwrap();
-    static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w])\s*:\s*\{(?P<label>[\w\s*,]+)\}").unwrap();
+        Regex::new(r"iflabel\s+fn\s*\(\s*(?P<arg>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z]]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})\s*\)\s*(\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)?\s*\})?").unwrap();
+    static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w])\s*:\s*\{(?P<label>[\w\s*,]+)?\}").unwrap();
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]
@@ -16,7 +17,6 @@ pub(crate) struct Label {
 }
 
 impl Label {
-    #[allow(dead_code)]
     pub(crate) fn new(principals: Vec<String>) -> Self {
         Self { principals }
     }
@@ -35,7 +35,7 @@ impl Label {
             return "{}".to_string();
         }
         let principals = self.principals.join(", ");
-        format!("{{ {} }}", principals)
+        format!("{{{}}}", principals)
     }
 
     /// Check labels direction conversion i.e. you can move down in the lattice, not up
@@ -151,12 +151,23 @@ impl FromStr for FunctionLabel {
                             let captures = ARG_LABEL_REGEX.captures(arg_label);
                             match captures {
                                 Some(captures) => {
-                                    let argname = captures.name("argname").unwrap().as_str();
-                                    let label = captures.name("label").unwrap().as_str();
-                                    labels.push((
-                                        argname.to_string(),
-                                        label.parse::<Label>().unwrap(),
-                                    ));
+                                    if let Some(argname) = captures.name("argname") {
+                                        if let Some(labels_string) = captures.name("label") {
+                                            let label = Label::new(
+                                                labels_string
+                                                    .as_str()
+                                                    .split(',')
+                                                    .map(str::to_string)
+                                                    .collect(),
+                                            );
+                                            labels.push((argname.as_str().to_string(), label));
+                                        } else {
+                                            labels.push((
+                                                argname.as_str().to_string(),
+                                                Label::new_public(),
+                                            ));
+                                        }
+                                    }
                                 }
                                 None => return Err(LabelParseError),
                             }
@@ -170,7 +181,7 @@ impl FromStr for FunctionLabel {
                         let label = label.as_str();
                         Label::new(label.split(',').map(|s| s.trim().to_string()).collect())
                     }
-                    None => return Err(LabelParseError),
+                    None => Label::new_public(),
                 };
                 Ok(FunctionLabel {
                     argument_labels,

@@ -1082,7 +1082,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, value, .. }) => {
             if checker.enabled(Rule::IFExplicitVariableAssign) {
-                information_flow::rules::inconfidential_assign_target_statement(
+                information_flow::rules::illegal_assign_target_statement(
                     checker, &target, &value,
                 );
             }
@@ -1622,7 +1622,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
                 if checker.enabled(Rule::IFExplicitVariableAssign) {
-                    information_flow::rules::inconfidential_assign_target_statement(
+                    information_flow::rules::illegal_assign_target_statement(
                         checker, &target, value,
                     );
                 }
