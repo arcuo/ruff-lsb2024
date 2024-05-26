@@ -9,19 +9,28 @@ def help(a,b, public):
   var1 = a # iflabel {alice, bob}
 
   # Fail
-  var2 = a # iflabel {bob}
   var2 = a # iflabel {}
+  var2 = a # iflabel {bob}
 
   # Succeed
   var3 = b # iflabel {bob}
   var3 = b # iflabel {alice, bob}
 
   # Fail
-  var4 = b # iflabel {alice}
   var4 = b # iflabel {}
+  var4 = b # iflabel {alice}
 
 
-  return alice_var # OK but not if return was "public"
+  alice_return = 1 # iflabel {alice}
+  public_return = 3 # iflabel {}
+  bob_return = 2 # iflabel {bob}
+  alice_bob_return = 4 # iflabel {alice, bob}
+
+
+  return alice_return # Succeed
+  return public_return # Succeed
+  return bob_return # Fail
+  return alice_bob_return # Fail
 
 alice = 1 # iflabel {alice}
 public = 2 # iflabel {}

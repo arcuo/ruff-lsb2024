@@ -365,6 +365,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Return(_) => {
+            if checker.enabled(Rule::IFImplicitFunctionReturn) {
+                information_flow::rules::implicit_function_return(checker, stmt);
+            }
             if checker.enabled(Rule::ReturnOutsideFunction) {
                 pyflakes::rules::return_outside_function(checker, stmt);
             }
