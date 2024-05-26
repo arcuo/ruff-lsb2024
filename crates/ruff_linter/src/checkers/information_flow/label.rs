@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::str::FromStr;
@@ -7,7 +6,7 @@ lazy_static! {
     static ref LABEL_REGEX: Regex =
         Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
     static ref FUNCTION_LABEL_REGEX: Regex =
-        Regex::new(r"iflabel\s+fn\s*\(\s*(?P<arg>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z]]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})\s*\)\s*(\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)?\s*\})?").unwrap();
+        Regex::new(r"iflabel\s+fn\s*\(\s*(?P<arg>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z]]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})?\s*\)\s*(\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)?\s*\})?").unwrap();
     static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w])\s*:\s*\{(?P<label>[\w\s*,]+)?\}").unwrap();
 }
 
@@ -46,7 +45,7 @@ impl Label {
     ///      \ /
     ///       0
     /// ```
-    pub(crate) fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
+    fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
         // If the test label is public, then it is never more restrictive
         if label.is_public() {
             return true;
@@ -64,8 +63,93 @@ impl Label {
         }
 
         // If the labels have the same principals, then you can "convert" between them
-        label.principals == self.principals
+        false
     }
+
+    fn is_same_branch(&self, label: &Label) -> bool {
+        if self.is_public() || label.is_public() {
+            return true;
+        }
+
+        if self.principals.len() != label.principals.len() {
+            return false;
+        }
+
+        for principal in &self.principals {
+            if !label.principals.contains(principal) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        other.is_higher_in_lattice_path(self) || !self.is_same_branch(other)
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        self.is_higher_in_lattice_path(other) || !self.is_same_branch(other)
+    }
+}
+
+impl PartialOrd for Label {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self == other {
+            return Some(std::cmp::Ordering::Equal);
+        }
+
+        if self.lt(other) {
+            return Some(std::cmp::Ordering::Less);
+        }
+
+        if self.gt(other) {
+            return Some(std::cmp::Ordering::Greater);
+        }
+
+        None
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        self.lt(other)
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        self.lt(other) || self == other
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        self.gt(other)
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        self.gt(other) || self == other
+    }
+}
+
+#[test]
+fn test_label_ordering() {
+    let a: Label = Label::new(vec!["alice".to_string()]);
+    let b: Label = Label::new(vec!["bob".to_string()]);
+    let ab: Label = Label::new(vec!["alice".to_string(), "bob".to_string()]);
+    let p: Label = Label::new_public();
+
+    assert!(a == a);
+    assert!(b == b);
+    assert!(ab == ab);
+    assert!(p == p);
+
+    assert!(a < ab);
+    assert!(b < ab);
+    assert!(p < a);
+    assert!(p < b);
+    assert!(p < ab);
+
+    // Test that you can't skip the lattice
+    assert!(b < a);
+    assert!(b > a);
+    assert!(a > b);
+    assert!(a > b);
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]
@@ -88,22 +172,6 @@ impl FunctionLabel {
             argument_labels,
             self.return_label.to_string()
         )
-    }
-}
-/// Note that this not strictly the total order. Instead it counts as the sqsubseteq relation
-/// This means that if a label is higher in the lattice, then it is greater than the other label
-/// Furthemore if the other label is in another branch of the lattice, we handle it as if it is greater (i.e. not compatible)
-/// Check the [`Label::is_higher_in_lattice_path`] function for more details
-impl PartialOrd for Label {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self == other {
-            return Some(std::cmp::Ordering::Equal);
-        }
-
-        if self.is_higher_in_lattice_path(other) {
-            return Some(std::cmp::Ordering::Greater);
-        }
-        return Some(std::cmp::Ordering::Less);
     }
 }
 

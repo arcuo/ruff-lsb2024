@@ -1,14 +1,10 @@
+use super::label::Label;
+use crate::checkers::ast::Checker;
+use ruff_python_ast::ExprName;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
     ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
-use ruff_python_semantic::BindingId;
-
-use crate::checkers::ast::Checker;
-
-use super::label::Label;
-
-use ruff_python_ast::ExprName;
 
 /// Fetch the label of a variable in the given scope
 pub(crate) fn get_variable_label_by_name(checker: &mut Checker, name: &ExprName) -> Option<Label> {
@@ -33,7 +29,7 @@ pub(crate) fn get_most_restrictive_label_from_list_of_expressions(
     for expr in expressions {
         if let Some(expr_label) = get_label_for_expression(checker, &expr) {
             if let Some(label) = curr_label.clone() {
-                if expr_label.is_higher_in_lattice_path(&label) {
+                if expr_label < label {
                     curr_label = Some(expr_label);
                 }
             } else {
@@ -54,19 +50,15 @@ pub(crate) fn get_higher_of_two_labels(
     label2: Option<Label>,
 ) -> Option<Label> {
     if label1.is_none() {
-        return label2;
+        label2
     } else if label2.is_none() {
-        return label1;
+        label1
     } else {
-        return if label1
-            .as_ref()
-            .unwrap()
-            .is_higher_in_lattice_path(label2.as_ref().unwrap())
-        {
-            label1
-        } else {
+        if label1.clone().unwrap() < label2.clone().unwrap() {
             label2
-        };
+        } else {
+            label1
+        }
     }
 }
 

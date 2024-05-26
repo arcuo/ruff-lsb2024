@@ -42,13 +42,14 @@ use crate::checkers::{
 #[violation]
 pub struct IFImplicitFunctionReturn {
     defined_return_label: Label,
+    return_expr: String,
     return_label: Label,
 }
 
 impl Violation for IFImplicitFunctionReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("") // TODO
+        format!("Illegal implicit information flow. Defined return label: {} is less than returned variable {} with label: {}", self.defined_return_label.to_string(), self.return_expr, self.return_label.to_string())
     }
 }
 
@@ -65,14 +66,22 @@ pub(crate) fn implicit_function_return(checker: &mut Checker, stmt: &Stmt) {
                 return;
             };
 
-            if let Some(fn_bid) = checker.semantic().current_scope().get(fn_name) {
+            let Some(parent_scope) = checker
+                .semantic()
+                .first_non_type_parent_scope(checker.semantic().current_scope())
+            else {
+                unreachable!("Expected parent scope to be a function scope")
+            };
+
+            if let Some(fn_bid) = parent_scope.get(fn_name) {
                 let defined_return_label = checker.information_flow().get_label(fn_bid);
 
-                if return_label > defined_return_label {
+                if defined_return_label < return_label {
                     checker.diagnostics.push(Diagnostic::new(
                         IFImplicitFunctionReturn {
-                            defined_return_label,
-                            return_label,
+                            defined_return_label: defined_return_label.unwrap_or_default(),
+                            return_label: return_label.unwrap_or_default(),
+                            return_expr: checker.locator().slice(value.range()).to_string(),
                         },
                         range.clone(),
                     ));
