@@ -151,10 +151,10 @@ impl InformationFlowState {
         // TODO: Declassification (invalid declassification check?)
 
         // Insert arguments into variable map based on binding_id and parameter name
-        if let Some(fucntion_label) = self.get_parameter_label(function_binding_id, &parameter_name)
+        if let Some(function_label) = self.get_parameter_label(function_binding_id, &parameter_name)
         {
             self.variable_map
-                .insert(parameter_binding_id, fucntion_label);
+                .insert(parameter_binding_id, function_label);
         } else {
             // No label comment, add public label
             self.variable_map

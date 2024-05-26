@@ -2266,21 +2266,27 @@ impl<'a> Checker<'a> {
 
                 self.visit_parameters(parameters);
 
-                if let Some(function_binding_id) = self.semantic.current_scope().get(function_name)
+                if let Some(parent_scope) = self
+                    .semantic
+                    .first_non_type_parent_scope(self.semantic.current_scope())
                 {
-                    for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
-                        let parameter_name = parameter.name.as_str();
-                        if let Some(param_binding_id) =
-                            self.semantic.current_scope().get(parameter_name)
-                        {
-                            self.information_flow
-                                .add_parameter_name_variable_label_binding(
-                                    function_binding_id,
-                                    param_binding_id,
-                                    parameter_name,
-                                );
+                    if let Some(function_binding_id) = parent_scope.get(function_name) {
+                        for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
+                            let parameter_name = parameter.name.as_str();
+                            if let Some(param_binding_id) =
+                                self.semantic.current_scope().get(parameter_name)
+                            {
+                                self.information_flow
+                                    .add_parameter_name_variable_label_binding(
+                                        function_binding_id,
+                                        param_binding_id,
+                                        parameter_name,
+                                    );
+                            }
                         }
                     }
+                } else {
+                    unreachable!("Expected parent scope");
                 }
 
                 // Set the docstring state before visiting the function body.
