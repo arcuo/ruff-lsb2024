@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
-assertion_line: 45
+assertion_line: 46
 ---
 IF202.py:19:3: IF202 Illegal implicit information flow. Defined return label: {alice} is less than returned variable bob_return with label: {bob}
    |

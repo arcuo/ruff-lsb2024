@@ -1,3 +1,4 @@
+use ast::ExprName;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Operator};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
@@ -15,7 +16,8 @@ use crate::rules::{
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
     flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_type_checking, flake8_use_pathlib,
-    flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint, pyupgrade, refurb, ruff,
+    flynt, information_flow, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pylint,
+    pyupgrade, refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -358,6 +360,34 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::IFImplicitArgument) {
+                let Expr::Name(ExprName { id, .. }) = func.as_ref() else {
+                    unreachable!("Expected a name expression")
+                };
+
+                let Some(function_binding_id) = checker.semantic().current_scope().get(id.as_str())
+                else {
+                    return;
+                };
+
+                for (arg_index, arg) in args.iter().enumerate() {
+                    information_flow::rules::check_implicit_arg_value(
+                        checker,
+                        function_binding_id,
+                        arg,
+                        arg_index,
+                    );
+                }
+
+                for keyword in keywords.iter() {
+                    information_flow::rules::check_implicit_keyword_value(
+                        checker,
+                        function_binding_id,
+                        keyword,
+                    );
+                }
+            }
+
             if checker.any_enabled(&[
                 // pylint
                 Rule::BadStringFormatCharacter,

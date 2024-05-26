@@ -1099,6 +1099,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // Information flow implicit rules (IF201-...)
         (InformationFlow, "201") => (RuleGroup::Stable, rules::information_flow::rules::IFImplicitVariableAssign),
         (InformationFlow, "202") => (RuleGroup::Stable, rules::information_flow::rules::IFImplicitFunctionReturn),
+        (InformationFlow, "203") => (RuleGroup::Stable, rules::information_flow::rules::IFImplicitArgument),
 
         _ => return None,
     })

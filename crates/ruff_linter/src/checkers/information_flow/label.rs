@@ -46,6 +46,10 @@ impl Label {
     ///       0
     /// ```
     fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
+        if self == label {
+            return false;
+        }
+
         // If the test label is public, then it is never more restrictive
         if label.is_public() {
             return true;

@@ -23,14 +23,14 @@ struct PC {
 /// State of the information flow
 #[derive()]
 pub(crate) struct InformationFlowState {
-    // The current principles of the program, e.g. ['alice', 'bob']
+    /// The current principles of the program, e.g. ['alice', 'bob']
     #[allow(dead_code)]
     principals: Principals,
-    // The current scope level queue. The level is updated according to the scope by popping and
+    /// The current scope level queue. The level is updated according to the scope by popping and
     pc: VecDeque<PC>,
-    // Map from variable name to
+    /// Map from variable name to
     variable_map: FxHashMap<BindingId, Label>,
-    // Map from function name to parameter label
+    /// Map from function name to parameter label
     function_parameter_map: FxHashMap<BindingId, FxHashMap<String, Label>>,
 }
 
@@ -82,7 +82,7 @@ impl InformationFlowState {
         return self.variable_map.get(&binding_id).cloned();
     }
 
-    pub(crate) fn get_parameter_label(
+    pub(crate) fn get_parameter_label_by_name(
         &self,
         function_binding_id: BindingId,
         parameter_name: &str,
@@ -90,6 +90,20 @@ impl InformationFlowState {
         if let Some(labels) = self.function_parameter_map.get(&function_binding_id) {
             if let Some(label) = labels.get(parameter_name) {
                 return Some(label.clone());
+            }
+        }
+        None
+    }
+
+    /// Get the name and label of the parameter by index
+    pub(crate) fn get_parameter_label_by_index(
+        &self,
+        function_binding_id: BindingId,
+        index: usize,
+    ) -> Option<(String, Label)> {
+        if let Some(labels) = self.function_parameter_map.get(&function_binding_id) {
+            if let Some((name, label)) = labels.iter().nth(index) {
+                return Some((name.clone(), label.clone()));
             }
         }
         None
@@ -151,7 +165,8 @@ impl InformationFlowState {
         // TODO: Declassification (invalid declassification check?)
 
         // Insert arguments into variable map based on binding_id and parameter name
-        if let Some(function_label) = self.get_parameter_label(function_binding_id, &parameter_name)
+        if let Some(function_label) =
+            self.get_parameter_label_by_name(function_binding_id, &parameter_name)
         {
             self.variable_map
                 .insert(parameter_binding_id, function_label);

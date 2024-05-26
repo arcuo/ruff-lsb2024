@@ -35,6 +35,7 @@ mod tests {
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201/IF201_nested.py"))]
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201/IF201_assert.py"))]
     #[test_case(Rule::IFImplicitFunctionReturn, Path::new("IF202.py"))]
+    #[test_case(Rule::IFImplicitArgument, Path::new("IF203.py"))]
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

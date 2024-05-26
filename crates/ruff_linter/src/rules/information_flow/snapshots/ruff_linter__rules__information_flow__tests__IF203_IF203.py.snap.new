@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 46
+---
+IF203.py:14:6: IF203 
+   |
+12 | ## Argument
+13 | 
+14 | help(secret) #  Fail
+   |      ^^^^^^ IF203
+15 | help("hello") # Succeed
+   |
+
+IF203.py:19:8: IF203 
+   |
+17 | ## Keyword
+18 | 
+19 | help(p=secret) # Fail
+   |        ^^^^^^ IF203
+20 | help(p="hello") # Succeed
+   |
