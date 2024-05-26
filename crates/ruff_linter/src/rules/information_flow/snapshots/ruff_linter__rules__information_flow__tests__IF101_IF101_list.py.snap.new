@@ -1,0 +1,73 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 46
+---
+IF101_list.py:15:1: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `[1, 2, alice_bob_var]` with label `{alice, bob}`
+   |
+14 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+15 | bob_var = [1, 2, alice_bob_var]
+   | ^^^^^^^ IF101
+16 | 
+17 | # IF101: Fail - Information flow from {bob} to {public}
+   |
+
+IF101_list.py:18:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `[1, 2, bob_var]` with label `{bob}`
+   |
+17 | # IF101: Fail - Information flow from {bob} to {public}
+18 | public_var = [1, 2, bob_var]
+   | ^^^^^^^^^^ IF101
+19 | 
+20 | # Tuple assignment
+   |
+
+IF101_list.py:26:1: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `(1, 2, alice_bob_var)` with label `{alice, bob}`
+   |
+25 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+26 | bob_var = (1, 2, alice_bob_var)
+   | ^^^^^^^ IF101
+27 | 
+28 | # IF101: Fail - Information flow from {bob} to {public}
+   |
+
+IF101_list.py:29:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `(1, 2, bob_var)` with label `{bob}`
+   |
+28 | # IF101: Fail - Information flow from {bob} to {public}
+29 | public_var = (1, 2, bob_var)
+   | ^^^^^^^^^^ IF101
+30 | 
+31 | # Set assignment
+   |
+
+IF101_list.py:37:1: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `{1, 2, alice_bob_var}` with label `{alice, bob}`
+   |
+36 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+37 | bob_var = {1, 2, alice_bob_var}
+   | ^^^^^^^ IF101
+38 | 
+39 | # IF101: Fail - Information flow from {bob} to {public}
+   |
+
+IF101_list.py:40:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `{1, 2, bob_var}` with label `{bob}`
+   |
+39 | # IF101: Fail - Information flow from {bob} to {public}
+40 | public_var = {1, 2, bob_var}
+   | ^^^^^^^^^^ IF101
+41 | 
+42 | # Dict assignment
+   |
+
+IF101_list.py:48:1: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `{1: 2, 3: alice_bob_var}` with label `{alice, bob}`
+   |
+47 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+48 | bob_var = {1: 2, 3: alice_bob_var}
+   | ^^^^^^^ IF101
+49 | 
+50 | # IF101: Fail - Information flow from {bob} to {public}
+   |
+
+IF101_list.py:51:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `{1: 2, 3: bob_var}` with label `{bob}`
+   |
+50 | # IF101: Fail - Information flow from {bob} to {public}
+51 | public_var = {1: 2, 3: bob_var}
+   | ^^^^^^^^^^ IF101
+   |
