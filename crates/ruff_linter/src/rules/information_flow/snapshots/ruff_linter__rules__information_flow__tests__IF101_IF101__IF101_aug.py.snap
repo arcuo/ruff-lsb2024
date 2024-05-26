@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+---
+IF101_aug.py:18:1: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `alice_bob_var` with label `{alice, bob}`
+   |
+17 | # IF101: Fail Information flow from b to a
+18 | bob_var += alice_bob_var
+   | ^^^^^^^ IF101
+19 | 
+20 | # IF101: Fail Information flow from b to a
+   |
+
+IF101_aug.py:21:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public_var` with label `{}` is being assigned to `bob_var` with label `{bob}`
+   |
+20 | # IF101: Fail Information flow from b to a
+21 | public_var += bob_var
+   | ^^^^^^^^^^ IF101
+   |

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
-assertion_line: 43
 ---
 IF101_fun.py:12:3: IF101 Illegal explicit assignment to more restrictive variable. Target `var2` with label `{}` is being assigned to `a` with label `{alice}`
    |
@@ -36,10 +35,10 @@ IF101_fun.py:21:3: IF101 Illegal explicit assignment to more restrictive variabl
    |   ^^^^ IF101
    |
 
-IF101_fun.py:43:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public` with label `{}` is being assigned to `help(alice, public)` with label `{alice}`
+IF101_fun.py:33:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public` with label `{}` is being assigned to `help(alice, public)` with label `{alice}`
    |
-42 | # Checking return
-43 | public = help(alice, public) # Fail
+32 | # Checking return
+33 | public = help(alice, public) # Fail
    | ^^^^^^ IF101
-44 | alice = help(alice, public) # Succeed 
+34 | alice = help(alice, public) # Succeed 
    |

@@ -65,7 +65,7 @@ pub(crate) fn check_implicit_arg_value(
 
     let arg_label = get_label_for_expression(checker, arg).unwrap_or_default();
 
-    if defined_arg_label < arg_label {
+    if !(arg_label <= defined_arg_label) {
         let diagnostic = Diagnostic::new(
             IFImplicitArgument {
                 argname: argname.to_string(),
@@ -96,7 +96,7 @@ pub(crate) fn check_implicit_keyword_value(
 
     let arg_label = get_label_for_expression(checker, &kw.value).unwrap_or_default();
 
-    if defined_arg_label < arg_label {
+    if !(arg_label <= defined_arg_label) {
         let diagnostic = Diagnostic::new(
             IFImplicitArgument {
                 argname: arg.as_str().to_string(),

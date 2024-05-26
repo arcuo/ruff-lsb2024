@@ -22,22 +22,12 @@ def help(a,b, public):
 
 
   alice_return = 1 # iflabel {alice}
-  public_return = 3 # iflabel {}
-  bob_return = 2 # iflabel {bob}
-  alice_bob_return = 4 # iflabel {alice, bob}
 
 
-  return alice_return # Succeed
-  return public_return # Succeed
-  return bob_return # Fail
-  return alice_bob_return # Fail
+  return alice_return
 
 alice = 1 # iflabel {alice}
 public = 2 # iflabel {}
-
-# # Checking args
-# help(alice, public) # OK
-# help(public, alice) # Fail b has a public label
 
 # Checking return
 public = help(alice, public) # Fail

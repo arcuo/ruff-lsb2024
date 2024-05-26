@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF002.py:6:18: IF002 [*] Missing principal `charlie` in the principals list for `{ charlie }`
+IF002.py:6:18: IF002 [*] Missing principal `charlie` in the principals list for `{charlie}`
   |
 4 | ## BAD
 5 | 
@@ -18,7 +18,7 @@ IF002.py:6:18: IF002 [*] Missing principal `charlie` in the principals list for 
 3 3 | 
 4 4 | ## BAD
 
-IF002.py:7:31: IF002 [*] Missing principal `charlie` in the principals list for `{ alice, charlie }`
+IF002.py:7:31: IF002 [*] Missing principal `charlie` in the principals list for `{alice, charlie}`
   |
 6 | b = 0 # iflabel {charlie}
 7 | b2: int = 0 # iflabel {alice, charlie}

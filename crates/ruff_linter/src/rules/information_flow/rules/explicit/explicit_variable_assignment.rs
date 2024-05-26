@@ -81,20 +81,18 @@ pub(crate) fn illegal_assign_target_statement(
 
                 // Value is not public, check if label(target) >= label(value)
                 if let Some(target_label) = target_label {
-                    if target_label >= value_label {
-                        return;
+                    if !(value_label <= target_label) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            IFExplicitVariableAssign {
+                                target: target_name.id.clone(),
+                                target_label,
+                                expr: checker.locator().slice(value.range()).to_string(),
+                                expr_label: value_label,
+                            },
+                            target.range(),
+                        ));
                     }
-
-                    // target_label < value_label
-                    checker.diagnostics.push(Diagnostic::new(
-                        IFExplicitVariableAssign {
-                            target: target_name.id.clone(),
-                            target_label,
-                            expr: checker.locator().slice(value.range()).to_string(),
-                            expr_label: value_label,
-                        },
-                        target.range(),
-                    ));
+                    
                 }
             }
         }

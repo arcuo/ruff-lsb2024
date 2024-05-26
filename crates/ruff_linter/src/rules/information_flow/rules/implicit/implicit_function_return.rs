@@ -76,7 +76,7 @@ pub(crate) fn implicit_function_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(fn_bid) = parent_scope.get(fn_name) {
                 let defined_return_label = checker.information_flow().get_label(fn_bid);
 
-                if defined_return_label < return_label {
+                if !(return_label <= defined_return_label) {
                     checker.diagnostics.push(Diagnostic::new(
                         IFImplicitFunctionReturn {
                             defined_return_label: defined_return_label.unwrap_or_default(),

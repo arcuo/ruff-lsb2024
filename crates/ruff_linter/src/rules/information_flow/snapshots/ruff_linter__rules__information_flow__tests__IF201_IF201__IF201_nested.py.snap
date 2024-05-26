@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF201_nested.py:11:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 10
+IF201_nested.py:11:5: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 10
    |
 10 | if secret_var > 0: # PC = {secret}
 11 |     public_var = 0 # Fail
@@ -10,7 +10,7 @@ IF201_nested.py:11:5: IF201 Illegal implicit information flow. Current pc label:
 13 |         public_var += 1 # Fail
    |
 
-IF201_nested.py:13:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 10
+IF201_nested.py:13:9: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 10
    |
 11 |     public_var = 0 # Fail
 12 |     while public_var < 10: # PC = {secret}
@@ -20,7 +20,7 @@ IF201_nested.py:13:9: IF201 Illegal implicit information flow. Current pc label:
 15 | if public_var > 0: # PC = {}
    |
 
-IF201_nested.py:18:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 17
+IF201_nested.py:18:9: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 17
    |
 16 |     public_var = 0 # Success
 17 |     while secret_var < 10: # PC = {secret}
@@ -30,7 +30,7 @@ IF201_nested.py:18:9: IF201 Illegal implicit information flow. Current pc label:
 20 | ## Nested IF in WHILE
    |
 
-IF201_nested.py:23:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 22
+IF201_nested.py:23:5: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 22
    |
 22 | while secret_var < 10: # PC = {secret}
 23 |     public_var = 0 # Fail
@@ -39,7 +39,7 @@ IF201_nested.py:23:5: IF201 Illegal implicit information flow. Current pc label:
 25 |     if public_var < 10: # PC = {secret}
    |
 
-IF201_nested.py:26:9: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 22
+IF201_nested.py:26:9: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 22
    |
 24 |     secret_var += 1 # Success
 25 |     if public_var < 10: # PC = {secret}
@@ -49,7 +49,7 @@ IF201_nested.py:26:9: IF201 Illegal implicit information flow. Current pc label:
 28 | while public_var < 10:
    |
 
-IF201_nested.py:37:1: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 35
+IF201_nested.py:37:1: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 35
    |
 35 | assert secret_var > 0
 36 | 
@@ -59,7 +59,7 @@ IF201_nested.py:37:1: IF201 Illegal implicit information flow. Current pc label:
 39 | if public_var == 0:
    |
 
-IF201_nested.py:40:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 35
+IF201_nested.py:40:5: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 35
    |
 39 | if public_var == 0:
 40 |     public_var += 1 # Fail
@@ -68,7 +68,7 @@ IF201_nested.py:40:5: IF201 Illegal implicit information flow. Current pc label:
 42 | while public_var < 10:
    |
 
-IF201_nested.py:43:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 35
+IF201_nested.py:43:5: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 35
    |
 42 | while public_var < 10:
 43 |     public_var += 1 # Fail

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF201_for.py:10:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 9
+IF201_for.py:10:5: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 9
    |
  9 | for s in secret_arr: # PC = {secret}
 10 |     public_var = 0 # Fail
@@ -10,7 +10,7 @@ IF201_for.py:10:5: IF201 Illegal implicit information flow. Current pc label: { 
 12 |     public_var: int = 0 # Fail
    |
 
-IF201_for.py:11:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 9
+IF201_for.py:11:5: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 9
    |
  9 | for s in secret_arr: # PC = {secret}
 10 |     public_var = 0 # Fail
@@ -19,7 +19,7 @@ IF201_for.py:11:5: IF201 Illegal implicit information flow. Current pc label: { 
 12 |     public_var: int = 0 # Fail
    |
 
-IF201_for.py:12:5: IF201 Illegal implicit information flow. Current pc label: { secret } is greater than target label: {}. Current pc set at line 9
+IF201_for.py:12:5: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 9
    |
 10 |     public_var = 0 # Fail
 11 |     public_var += 1 # Fail

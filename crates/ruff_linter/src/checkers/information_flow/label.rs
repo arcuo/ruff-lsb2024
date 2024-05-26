@@ -37,7 +37,9 @@ impl Label {
         format!("{{{}}}", principals)
     }
 
-    /// Check labels direction conversion i.e. you can move down in the lattice, not up
+    /// E.g true for AB.is_higher_in_lattice_path(A) and AB.is_higher_in_lattice_path(B),
+    /// but false for A.is_higher_in_lattice_path(B)
+    ///
     /// ```latex
     ///       AB
     ///      / \
@@ -46,54 +48,20 @@ impl Label {
     ///       0
     /// ```
     fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
-        if self == label {
-            return false;
-        }
-
-        // If the test label is public, then it is never more restrictive
-        if label.is_public() {
-            return true;
-        }
-
         // If self has more principals, then it is higher in the lattice
         if self.principals.len() > label.principals.len() {
             // Check if the label is a subset of the self
             for principal in &label.principals {
-                if self.principals.contains(principal) {
-                    return true;
+                if !self.principals.contains(principal) {
+                    return false;
                 }
             }
-            return false;
-        }
 
-        // If the labels have the same principals, then you can "convert" between them
-        false
-    }
-
-    fn is_same_branch(&self, label: &Label) -> bool {
-        if self.is_public() || label.is_public() {
             return true;
         }
 
-        if self.principals.len() != label.principals.len() {
-            return false;
-        }
-
-        for principal in &self.principals {
-            if !label.principals.contains(principal) {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    fn lt(&self, other: &Self) -> bool {
-        other.is_higher_in_lattice_path(self) || !self.is_same_branch(other)
-    }
-
-    fn gt(&self, other: &Self) -> bool {
-        self.is_higher_in_lattice_path(other) || !self.is_same_branch(other)
+        // If the labels have the same principals, then you can "convert" between them
+        return false;
     }
 }
 
@@ -115,19 +83,19 @@ impl PartialOrd for Label {
     }
 
     fn lt(&self, other: &Self) -> bool {
-        self.lt(other)
+        self != other && other.is_higher_in_lattice_path(self)
     }
 
     fn le(&self, other: &Self) -> bool {
-        self.lt(other) || self == other
+        self == other || self.lt(other)
     }
 
     fn gt(&self, other: &Self) -> bool {
-        self.gt(other)
+        self != other && self.is_higher_in_lattice_path(other)
     }
 
     fn ge(&self, other: &Self) -> bool {
-        self.gt(other) || self == other
+        self == other || self.gt(other)
     }
 }
 
@@ -149,11 +117,11 @@ fn test_label_ordering() {
     assert!(p < b);
     assert!(p < ab);
 
-    // Test that you can't skip the lattice
-    assert!(b < a);
-    assert!(b > a);
-    assert!(a > b);
-    assert!(a > b);
+    assert!(a <= a);
+    assert!(a <= ab);
+    assert!(b <= ab);
+    assert!(p <= a);
+    assert!(!(b <= a));
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]
@@ -309,12 +277,11 @@ mod test_labels {
     }
 
     #[test]
-    fn test_label_convertion() {
+    fn test_label_conversion() {
         let label1 = Label::new(vec!["alice".to_string(), "bob".to_string()]);
         let label2 = Label::new(vec!["alice".to_string()]);
         let label3 = Label::new(vec!["bob".to_string()]);
 
-        assert!(label1.is_higher_in_lattice_path(&label1));
         assert!(label1.is_higher_in_lattice_path(&label2));
         assert!(label1.is_higher_in_lattice_path(&label3));
 
