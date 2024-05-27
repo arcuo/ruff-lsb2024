@@ -108,9 +108,16 @@ impl InformationFlowState {
         }
         None
     }
-    
+
     /// Add a information flow label to the binding_id in the variable map
-    pub(crate) fn add_binding_label(&mut self, kind: BindingKind, binding_id: BindingId, range: TextRange, locator: &Locator, comment_ranges: &CommentRanges, ) {
+    pub(crate) fn add_binding_label(
+        &mut self,
+        kind: BindingKind,
+        binding_id: BindingId,
+        range: TextRange,
+        locator: &Locator,
+        comment_ranges: &CommentRanges,
+    ) {
         match kind {
             // Ignored bindings
             BindingKind::Export(_)
@@ -122,7 +129,7 @@ impl InformationFlowState {
             | BindingKind::BoundException
             | BindingKind::UnboundException(_)
             | BindingKind::ClassDefinition(_) => {},
-            
+
             // Handled bindings
             BindingKind::Annotation
             | BindingKind::NamedExprAssignment
@@ -138,7 +145,7 @@ impl InformationFlowState {
                     comment_ranges,
                 );
             }
-            
+
             // Function bindings
             BindingKind::FunctionDefinition(_) => {
                 self.add_function_variable_label_binding(
@@ -148,9 +155,11 @@ impl InformationFlowState {
                     comment_ranges,
                 );
             }
-            
+
             // todos
-            BindingKind::FromImport(_) |            BindingKind::Import(_) | BindingKind::FutureImport 
+            BindingKind::FromImport(_)
+            | BindingKind::Import(_)
+            | BindingKind::FutureImport
             | BindingKind::SubmoduleImport(_) => {
                 // TODO: Add information flow for imports.
             }
@@ -181,6 +190,8 @@ impl InformationFlowState {
         }
     }
 
+    /// Add a function variable label binding to the variable map
+    /// Use [`InformationFlowState::add_binding_label`] instead
     pub(crate) fn add_function_variable_label_binding(
         &mut self,
         binding_id: BindingId,
