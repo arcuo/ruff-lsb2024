@@ -5,6 +5,9 @@ use std::str::FromStr;
 lazy_static! {
     static ref LABEL_REGEX: Regex =
         Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
+    static ref FUNCTION_LABEL_REGEX: Regex =
+        Regex::new(r"iflabel\s+fn\s*\(\s*(?P<arg>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z]]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})?\s*\)\s*(\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)?\s*\})?").unwrap();
+    static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w])\s*:\s*\{(?P<label>[\w\s*,]+)?\}").unwrap();
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]
@@ -13,7 +16,6 @@ pub(crate) struct Label {
 }
 
 impl Label {
-    #[allow(dead_code)]
     pub(crate) fn new(principals: Vec<String>) -> Self {
         Self { principals }
     }
@@ -32,10 +34,12 @@ impl Label {
             return "{}".to_string();
         }
         let principals = self.principals.join(", ");
-        format!("{{ {} }}", principals)
+        format!("{{{}}}", principals)
     }
 
-    /// Check labels direction conversion i.e. you can move down in the lattice, not up
+    /// E.g true for AB.is_higher_in_lattice_path(A) and AB.is_higher_in_lattice_path(B),
+    /// but false for A.is_higher_in_lattice_path(B)
+    ///
     /// ```latex
     ///       AB
     ///      / \
@@ -43,43 +47,103 @@ impl Label {
     ///      \ /
     ///       0
     /// ```
-    pub(crate) fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
-        // If the test label is public, then it is never more restrictive
-        if label.is_public() {
-            return true;
-        }
-
+    fn is_higher_in_lattice_path(&self, label: &Label) -> bool {
         // If self has more principals, then it is higher in the lattice
         if self.principals.len() > label.principals.len() {
             // Check if the label is a subset of the self
             for principal in &label.principals {
-                if self.principals.contains(principal) {
-                    return true;
+                if !self.principals.contains(principal) {
+                    return false;
                 }
             }
-            return false;
+
+            return true;
         }
 
         // If the labels have the same principals, then you can "convert" between them
-        label.principals == self.principals
+        return false;
     }
 }
 
-/// Note that this not strictly the total order. Instead it counts as the sqsubseteq relation
-/// This means that if a label is higher in the lattice, then it is greater than the other label
-/// Furthemore if the other label is in another branch of the lattice, we handle it as if it is greater (i.e. not compatible)
-/// Check the [`Label::is_higher_in_lattice_path`] function for more details
 impl PartialOrd for Label {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if self == other {
             return Some(std::cmp::Ordering::Equal);
         }
 
-        if self.is_higher_in_lattice_path(other) {
-            return Some(std::cmp::Ordering::Greater);
-        } else {
+        if self.lt(other) {
             return Some(std::cmp::Ordering::Less);
         }
+
+        if self.gt(other) {
+            return Some(std::cmp::Ordering::Greater);
+        }
+
+        None
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        self != other && other.is_higher_in_lattice_path(self)
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        self == other || self.lt(other)
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        self != other && self.is_higher_in_lattice_path(other)
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        self == other || self.gt(other)
+    }
+}
+
+#[test]
+fn test_label_ordering() {
+    let a: Label = Label::new(vec!["alice".to_string()]);
+    let b: Label = Label::new(vec!["bob".to_string()]);
+    let ab: Label = Label::new(vec!["alice".to_string(), "bob".to_string()]);
+    let p: Label = Label::new_public();
+
+    assert!(a == a);
+    assert!(b == b);
+    assert!(ab == ab);
+    assert!(p == p);
+
+    assert!(a < ab);
+    assert!(b < ab);
+    assert!(p < a);
+    assert!(p < b);
+    assert!(p < ab);
+
+    assert!(a <= a);
+    assert!(a <= ab);
+    assert!(b <= ab);
+    assert!(p <= a);
+    assert!(!(b <= a));
+}
+
+#[derive(Debug, PartialEq, Clone, Default, Eq)]
+pub(crate) struct FunctionLabel {
+    pub(crate) argument_labels: Vec<(String, Label)>,
+    pub(crate) return_label: Label,
+}
+impl FunctionLabel {
+    #[allow(dead_code)]
+    pub(crate) fn to_string(&self) -> String {
+        let argument_labels = self
+            .argument_labels
+            .iter()
+            .map(|(name, label)| format!("{}: {}", name, label.to_string()))
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        format!(
+            "{{ {} }} {{{}}}",
+            argument_labels,
+            self.return_label.to_string()
+        )
     }
 }
 
@@ -109,6 +173,61 @@ impl FromStr for Label {
                 }
                 None => Ok(Label::new_public()),
             },
+            None => Err(LabelParseError),
+        }
+    }
+}
+
+impl FromStr for FunctionLabel {
+    type Err = LabelParseError;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        match FUNCTION_LABEL_REGEX.captures(string) {
+            Some(captures) => {
+                let argument_labels = match captures.name("arg") {
+                    Some(arg) => {
+                        let mut labels = vec![];
+                        for arg_label in arg.as_str().split(',') {
+                            let captures = ARG_LABEL_REGEX.captures(arg_label);
+                            match captures {
+                                Some(captures) => {
+                                    if let Some(argname) = captures.name("argname") {
+                                        if let Some(labels_string) = captures.name("label") {
+                                            let label = Label::new(
+                                                labels_string
+                                                    .as_str()
+                                                    .split(',')
+                                                    .map(str::to_string)
+                                                    .collect(),
+                                            );
+                                            labels.push((argname.as_str().to_string(), label));
+                                        } else {
+                                            labels.push((
+                                                argname.as_str().to_string(),
+                                                Label::new_public(),
+                                            ));
+                                        }
+                                    }
+                                }
+                                None => return Err(LabelParseError),
+                            }
+                        }
+                        labels
+                    }
+                    None => vec![],
+                };
+                let return_label = match captures.name("returnlabel") {
+                    Some(label) => {
+                        let label = label.as_str();
+                        Label::new(label.split(',').map(|s| s.trim().to_string()).collect())
+                    }
+                    None => Label::new_public(),
+                };
+                Ok(FunctionLabel {
+                    argument_labels,
+                    return_label,
+                })
+            }
             None => Err(LabelParseError),
         }
     }
@@ -163,7 +282,6 @@ mod test_labels {
         let label2 = Label::new(vec!["alice".to_string()]);
         let label3 = Label::new(vec!["bob".to_string()]);
 
-        assert!(label1.is_higher_in_lattice_path(&label1));
         assert!(label1.is_higher_in_lattice_path(&label2));
         assert!(label1.is_higher_in_lattice_path(&label3));
 

@@ -2,13 +2,13 @@ use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 
 use ruff_python_index::Indexer;
-use ruff_python_semantic::BindingId;
+use ruff_python_semantic::{BindingId, BindingKind};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use super::{
-    label::Label,
+    label::{FunctionLabel, Label},
     principals::{initiate_principals, Principals},
 };
 
@@ -23,13 +23,15 @@ struct PC {
 /// State of the information flow
 #[derive()]
 pub(crate) struct InformationFlowState {
-    // The current principles of the program, e.g. ['alice', 'bob']
+    /// The current principles of the program, e.g. ['alice', 'bob']
     #[allow(dead_code)]
     principals: Principals,
-    // The current scope level queue. The level is updated according to the scope by popping and
+    /// The current scope level queue. The level is updated according to the scope by popping and
     pc: VecDeque<PC>,
-    // Map from variable name to
+    /// Map from variable name to
     variable_map: FxHashMap<BindingId, Label>,
+    /// Map from function name to parameter label
+    function_parameter_map: FxHashMap<BindingId, FxHashMap<String, Label>>,
 }
 
 impl InformationFlowState {
@@ -38,6 +40,7 @@ impl InformationFlowState {
             principals: initiate_principals(indexer, locator),
             variable_map: FxHashMap::default(),
             pc: VecDeque::default(),
+            function_parameter_map: FxHashMap::default(),
         }
     }
 
@@ -79,30 +82,162 @@ impl InformationFlowState {
         return self.variable_map.get(&binding_id).cloned();
     }
 
+    pub(crate) fn get_parameter_label_by_name(
+        &self,
+        function_binding_id: BindingId,
+        parameter_name: &str,
+    ) -> Option<Label> {
+        if let Some(labels) = self.function_parameter_map.get(&function_binding_id) {
+            if let Some(label) = labels.get(parameter_name) {
+                return Some(label.clone());
+            }
+        }
+        None
+    }
+
+    /// Get the name and label of the parameter by index
+    pub(crate) fn get_parameter_label_by_index(
+        &self,
+        function_binding_id: BindingId,
+        index: usize,
+    ) -> Option<(String, Label)> {
+        if let Some(labels) = self.function_parameter_map.get(&function_binding_id) {
+            if let Some((name, label)) = labels.iter().nth(index) {
+                return Some((name.clone(), label.clone()));
+            }
+        }
+        None
+    }
+
+    /// Add a information flow label to the binding_id in the variable map
+    pub(crate) fn add_binding_label(
+        &mut self,
+        kind: BindingKind,
+        binding_id: BindingId,
+        range: TextRange,
+        locator: &Locator,
+        comment_ranges: &CommentRanges,
+    ) {
+        match kind {
+            // Ignored bindings
+            BindingKind::Export(_)
+            | BindingKind::Builtin
+            | BindingKind::Argument // Arguments are handled separately in `visit_deferred_functions`.
+            | BindingKind::TypeParam
+            | BindingKind::ConditionalDeletion(_)
+            | BindingKind::Deletion
+            | BindingKind::BoundException
+            | BindingKind::UnboundException(_)
+            | BindingKind::ClassDefinition(_) => {},
+
+            // Handled bindings
+            BindingKind::Annotation
+            | BindingKind::NamedExprAssignment
+            | BindingKind::Assignment
+            | BindingKind::LoopVar
+            | BindingKind::WithItemVar
+            | BindingKind::Global
+            | BindingKind::Nonlocal(_) => {
+                self.add_variable_label_binding(
+                    binding_id,
+                    range,
+                    locator,
+                    comment_ranges,
+                );
+            }
+
+            // Function bindings
+            BindingKind::FunctionDefinition(_) => {
+                self.add_function_variable_label_binding(
+                    binding_id,
+                    range,
+                    locator,
+                    comment_ranges,
+                );
+            }
+
+            // todos
+            BindingKind::FromImport(_)
+            | BindingKind::Import(_)
+            | BindingKind::FutureImport
+            | BindingKind::SubmoduleImport(_) => {
+                // TODO: Add information flow for imports.
+            }
+            BindingKind::ComprehensionVar => {
+                // TODO for comprehension var
+            },
+        }
+    }
+
+    /// Add a variable label binding to the variable map
+    /// Use [`InformationFlowState::add_binding_label`] instead
     pub(crate) fn add_variable_label_binding(
         &mut self,
         binding_id: BindingId,
         range: TextRange,
         locator: &Locator,
         comment_ranges: &CommentRanges,
-        binding_label: Option<Label>,
+    ) {
+        // Check for label from shadowed bindings
+        // TODO: Declassification (invalid declassification check?)
+
+        // Read from comment
+        if let Some((label, _)) = get_comment_text(range, locator, comment_ranges) {
+            if let Ok(label) = label.as_str().parse::<Label>() {
+                self.variable_map.insert(binding_id, label);
+                return;
+            }
+        }
+    }
+
+    /// Add a function variable label binding to the variable map
+    /// Use [`InformationFlowState::add_binding_label`] instead
+    pub(crate) fn add_function_variable_label_binding(
+        &mut self,
+        binding_id: BindingId,
+        range: TextRange,
+        locator: &Locator,
+        comment_ranges: &CommentRanges,
     ) {
         // Check for label from shadowed bindings
         // TODO: Implement inheritance from shadowed bindings
         // TODO: Declassification (invalid declassification check?)
 
-        // Use the label if it is provided
-        if let Some(label) = binding_label {
-            self.variable_map.insert(binding_id, label);
-            return;
-        }
-
         // Read from comment
-        if let Some((label, ..)) = read_variable_label_from_source(range, locator, comment_ranges) {
-            self.variable_map.insert(binding_id, label);
+        if let Some((label, _)) = get_comment_text(range, locator, comment_ranges) {
+            if let Ok(fn_label) = label.as_str().parse::<FunctionLabel>() {
+                self.variable_map.insert(binding_id, fn_label.return_label);
+                for (name, label) in fn_label.argument_labels.iter() {
+                    self.function_parameter_map
+                        .entry(binding_id)
+                        .or_insert_with(FxHashMap::default)
+                        .insert(name.clone(), label.clone());
+                }
+                return;
+            }
+        }
+    }
+
+    pub(crate) fn add_parameter_name_variable_label_binding(
+        &mut self,
+        function_binding_id: BindingId,
+        parameter_binding_id: BindingId,
+        parameter_name: &str,
+    ) {
+        // Check for label from shadowed bindings
+        // TODO: Implement inheritance from shadowed bindings
+        // TODO: Declassification (invalid declassification check?)
+
+        // Insert arguments into variable map based on binding_id and parameter name
+        if let Some(function_label) =
+            self.get_parameter_label_by_name(function_binding_id, &parameter_name)
+        {
+            self.variable_map
+                .insert(parameter_binding_id, function_label);
         } else {
             // No label comment, add public label
-            self.variable_map.insert(binding_id, Label::new_public());
+            self.variable_map
+                .insert(parameter_binding_id, Label::new_public());
         }
     }
 
@@ -111,43 +246,50 @@ impl InformationFlowState {
     }
 }
 
-/// Read the variable label from the source code and return [`Label`] if found
-/// and the [`TextRange`] of the label
 pub(crate) fn read_variable_label_from_source(
     range: TextRange,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) -> Option<(Label, TextRange)> {
-    // Find comment on same line
-    let line_range = locator.line_range(range.start());
-    let inline_label_comment = comment_ranges.comments_in_range(line_range).first();
-
-    if let Some(comment_range) = inline_label_comment {
-        let comment_text: &str = &locator.slice(comment_range).replace('#', "");
-        if let Ok(label) = comment_text.parse::<Label>() {
-            return Some((label, comment_range.clone()));
-        }
-    } else {
-        // Find comment on previous line if it exists
-        let start_range = range.start().to_u32();
-        let preline_label_comment = if start_range != 0 {
-            comment_ranges
-                .comments_in_range(locator.line_range(TextSize::from(start_range - 1))) // Previous line
-                .first()
-        } else {
-            return None;
-        };
-
-        if let Some(comment_range) = preline_label_comment {
-            let comment_text: &str = &locator.slice(comment_range).replace('#', "");
-            if let Ok(label) = comment_text.parse::<Label>() {
-                return Some((label, comment_range.clone()));
-            } else {
-                return None;
-            }
+    if let Some((label, comment_range)) = get_comment_text(range, locator, comment_ranges) {
+        if let Ok(label) = label.as_str().parse::<Label>() {
+            return Some((label, comment_range));
         }
     }
-    return None;
+    None
+}
+
+fn get_previous_line(locator: &Locator, range: TextRange) -> Option<TextRange> {
+    let current_line = locator.line_range(range.start());
+    if (current_line.start().to_u32()) == 0 {
+        return None;
+    }
+
+    let previous_line = locator.line_range(TextSize::from(current_line.start().to_u32() - 1));
+    Some(previous_line)
+}
+
+/// Get the comment text inline or line above
+/// and the [`TextRange`] of the label
+pub(crate) fn get_comment_text(
+    range: TextRange,
+    locator: &Locator,
+    comment_ranges: &CommentRanges,
+) -> Option<(String, TextRange)> {
+    // Find comment on same line
+    let line_range = locator.line_range(range.start());
+    if let Some(inline_comment_range) = comment_ranges.comments_in_range(line_range).first() {
+        let comment_text = locator.slice(inline_comment_range).replace('#', "");
+        return Some((comment_text, inline_comment_range.clone()));
+    }
+
+    // Find comment on previous line if it exists
+    if let Some(previous_line_range) = get_previous_line(locator, range) {
+        let comment_text = locator.slice(previous_line_range).replace('#', "");
+        return Some((comment_text, previous_line_range.clone()));
+    };
+
+    None
 }
 
 #[cfg(test)]
@@ -192,7 +334,6 @@ c = 3
                             range,
                             &locator,
                             comment_ranges,
-                            None,
                         );
                     }
                 }
@@ -261,7 +402,6 @@ a = 1
                                 range,
                                 &locator,
                                 comment_ranges,
-                                None,
                             );
                         }
                         _ => {}
@@ -271,9 +411,7 @@ a = 1
             Err(_) => panic!("Failed to parse module"),
         }
 
-        assert!(state.variable_map.len() != 0);
-        assert!(state.variable_map.contains_key(&BindingId::from(0u32)));
-        assert!(state.variable_map.get(&BindingId::from(0u32)).unwrap() == &Label::new_public());
+        assert!(state.variable_map.len() == 0);
     }
 
     #[test]
@@ -308,7 +446,6 @@ b = 2 # iflabel {}
                             range,
                             &locator,
                             comment_ranges,
-                            None,
                         );
                     }
                 }
@@ -316,12 +453,7 @@ b = 2 # iflabel {}
             Err(_) => panic!("Failed to parse module"),
         }
 
-        assert!(state.variable_map.contains_key(&BindingId::from(0u32)));
         assert!(state.variable_map.contains_key(&BindingId::from(1u32)));
-        assert_eq!(
-            &state.variable_map[&BindingId::from(0u32)],
-            &Label::new_public()
-        );
         assert_eq!(
             &state.variable_map[&BindingId::from(1u32)],
             &Label::new_public()

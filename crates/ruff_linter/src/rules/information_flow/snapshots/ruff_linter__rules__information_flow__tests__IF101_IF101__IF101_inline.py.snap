@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+---
+IF101_inline.py:14:1: IF101 Illegal explicit assignment to more restrictive variable. Target `var3` with label `{bob}` is being assigned to `var1` with label `{alice, bob}`
+   |
+13 | # Fail
+14 | var3 = var1 # iflabel {bob}
+   | ^^^^ IF101
+15 | 
+16 | # Fail
+   |
+
+IF101_inline.py:17:1: IF101 Illegal explicit assignment to more restrictive variable. Target `var4` with label `{}` is being assigned to `var3` with label `{bob}`
+   |
+16 | # Fail
+17 | var4 = var3 # iflabel {}
+   | ^^^^ IF101
+   |

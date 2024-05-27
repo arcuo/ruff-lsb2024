@@ -1547,7 +1547,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 1: Binding.
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
-        for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
+        for (_i, parameter) in parameters
+            .iter()
+            .map(AnyParameterRef::as_parameter)
+            .enumerate()
+        {
             self.visit_parameter(parameter);
         }
 
@@ -1843,7 +1847,15 @@ impl<'a> Checker<'a> {
         };
 
         // Create the `Binding`.
-        let binding_id = self.semantic.push_binding(range, kind, flags);
+        let binding_id = self.semantic.push_binding(range, kind.clone(), flags);
+
+        self.information_flow.add_binding_label(
+            kind,
+            binding_id,
+            range,
+            self.locator(),
+            self.indexer.comment_ranges(),
+        );
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {
@@ -1894,20 +1906,6 @@ impl<'a> Checker<'a> {
             self.semantic
                 .shadowed_bindings
                 .insert(binding_id, shadowed_id);
-        } else {
-            // No shadowed binding, so this is a new binding.
-            // Add variable label to information flow
-
-            // TODO: Add check for is information flow is enabled
-            // TODO: Inherit binding from value
-            // TODO: Are there times when we can skip this?
-            self.information_flow.add_variable_label_binding(
-                binding_id,
-                range,
-                self.locator(),
-                self.indexer().comment_ranges(),
-                None,
-            );
         }
 
         // Add the binding to the scope.
@@ -2245,13 +2243,40 @@ impl<'a> Checker<'a> {
                 self.semantic.restore(snapshot);
 
                 let Stmt::FunctionDef(ast::StmtFunctionDef {
-                    body, parameters, ..
+                    body,
+                    parameters,
+                    name: function_name,
+                    ..
                 }) = self.semantic.current_statement()
                 else {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
 
                 self.visit_parameters(parameters);
+
+                if let Some(parent_scope) = self
+                    .semantic
+                    .first_non_type_parent_scope(self.semantic.current_scope())
+                {
+                    if let Some(function_binding_id) = parent_scope.get(function_name) {
+                        for parameter in parameters.iter().map(AnyParameterRef::as_parameter) {
+                            let parameter_name = parameter.name.as_str();
+                            if let Some(param_binding_id) =
+                                self.semantic.current_scope().get(parameter_name)
+                            {
+                                self.information_flow
+                                    .add_parameter_name_variable_label_binding(
+                                        function_binding_id,
+                                        param_binding_id,
+                                        parameter_name,
+                                    );
+                            }
+                        }
+                    }
+                } else {
+                    unreachable!("Expected parent scope");
+                }
+
                 // Set the docstring state before visiting the function body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);

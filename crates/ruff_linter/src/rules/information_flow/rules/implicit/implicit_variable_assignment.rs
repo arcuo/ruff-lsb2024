@@ -90,8 +90,9 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
             let pc = checker.information_flow().get_pc_label();
 
             if let Some(target_label) = target_label {
-                if pc > target_label {
+                if !(pc <= target_label) {
                     let pc_expr_range = checker.information_flow().get_pc_expr_range();
+                    #[allow(deprecated)]
                     checker.diagnostics.push(Diagnostic::new(
                         IFImplicitVariableAssign {
                             target: name_target.id.clone(),
