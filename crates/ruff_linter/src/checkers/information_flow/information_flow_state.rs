@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 
 use ruff_python_index::Indexer;
-use ruff_python_semantic::BindingId;
+use ruff_python_semantic::{BindingId, BindingKind};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
@@ -108,7 +108,60 @@ impl InformationFlowState {
         }
         None
     }
+    
+    /// Add a information flow label to the binding_id in the variable map
+    pub(crate) fn add_binding_label(&mut self, kind: BindingKind, binding_id: BindingId, range: TextRange, locator: &Locator, comment_ranges: &CommentRanges, ) {
+        match kind {
+            // Ignored bindings
+            BindingKind::Export(_)
+            | BindingKind::Builtin
+            | BindingKind::Argument // Arguments are handled separately in `visit_deferred_functions`.
+            | BindingKind::TypeParam
+            | BindingKind::ConditionalDeletion(_)
+            | BindingKind::Deletion
+            | BindingKind::BoundException
+            | BindingKind::UnboundException(_)
+            | BindingKind::ClassDefinition(_) => {},
+            
+            // Handled bindings
+            BindingKind::Annotation
+            | BindingKind::NamedExprAssignment
+            | BindingKind::Assignment
+            | BindingKind::LoopVar
+            | BindingKind::WithItemVar
+            | BindingKind::Global
+            | BindingKind::Nonlocal(_) => {
+                self.add_variable_label_binding(
+                    binding_id,
+                    range,
+                    locator,
+                    comment_ranges,
+                );
+            }
+            
+            // Function bindings
+            BindingKind::FunctionDefinition(_) => {
+                self.add_function_variable_label_binding(
+                    binding_id,
+                    range,
+                    locator,
+                    comment_ranges,
+                );
+            }
+            
+            // todos
+            BindingKind::FromImport(_) |            BindingKind::Import(_) | BindingKind::FutureImport 
+            | BindingKind::SubmoduleImport(_) => {
+                // TODO: Add information flow for imports.
+            }
+            BindingKind::ComprehensionVar => {
+                // TODO for comprehension var
+            },
+        }
+    }
 
+    /// Add a variable label binding to the variable map
+    /// Use [`InformationFlowState::add_binding_label`] instead
     pub(crate) fn add_variable_label_binding(
         &mut self,
         binding_id: BindingId,

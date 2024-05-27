@@ -1849,25 +1849,13 @@ impl<'a> Checker<'a> {
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind.clone(), flags);
 
-        match kind {
-            BindingKind::FunctionDefinition(_) => {
-                self.information_flow.add_function_variable_label_binding(
-                    binding_id,
-                    range,
-                    self.locator(),
-                    self.indexer().comment_ranges(),
-                );
-            }
-            BindingKind::Argument => {}
-            _ => {
-                self.information_flow.add_variable_label_binding(
-                    binding_id,
-                    range,
-                    self.locator(),
-                    self.indexer().comment_ranges(),
-                );
-            }
-        }
+        self.information_flow.add_binding_label(
+            kind,
+            binding_id,
+            range,
+            self.locator(),
+            self.indexer.comment_ranges(),
+        );
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {
