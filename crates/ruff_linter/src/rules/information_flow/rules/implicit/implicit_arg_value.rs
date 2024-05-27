@@ -47,7 +47,7 @@ pub struct IFImplicitArgument {
 impl Violation for IFImplicitArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("")
+        format!("Illegal implicit information flow. Argument \"{}\" has label {}, but the defined argument label is {}", self.argname, self.arg_label.to_string(), self.defined_arg_label.to_string())
     }
 }
 

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
-assertion_line: 46
 ---
 IF201_if.py:9:5: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 8
    |

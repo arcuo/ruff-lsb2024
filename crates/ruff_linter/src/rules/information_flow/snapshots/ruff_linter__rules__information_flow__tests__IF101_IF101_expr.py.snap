@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
-assertion_line: 46
 ---
 IF101_expr.py:14:1: IF101 Illegal explicit assignment to more restrictive variable. Target `bob_var` with label `{bob}` is being assigned to `alice_bob_var + 1` with label `{alice, bob}`
    |
