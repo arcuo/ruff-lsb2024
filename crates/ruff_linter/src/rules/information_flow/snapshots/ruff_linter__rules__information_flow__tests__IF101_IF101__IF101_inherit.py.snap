@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
-assertion_line: 47
 ---
 IF101_inherit.py:8:1: IF101 Illegal explicit assignment to more restrictive variable. Target `a` with label `{alice}` is being assigned to `b2` with label `{bob}`
    |
