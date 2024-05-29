@@ -361,31 +361,30 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             },
         ) => {
             if checker.enabled(Rule::IFImplicitArgument) {
-                let Expr::Name(ExprName { id, .. }) = func.as_ref() else {
-                    unreachable!("Expected a name expression") // TODO: error here
+                if let Expr::Name(ExprName { id, .. }) = func.as_ref() {
+                    let Some(function_binding_id) =
+                        checker.semantic().current_scope().get(id.as_str())
+                    else {
+                        return;
+                    };
+
+                    for (arg_index, arg) in args.iter().enumerate() {
+                        information_flow::rules::check_implicit_arg_value(
+                            checker,
+                            function_binding_id,
+                            arg,
+                            arg_index,
+                        );
+                    }
+
+                    for keyword in keywords.iter() {
+                        information_flow::rules::check_implicit_keyword_value(
+                            checker,
+                            function_binding_id,
+                            keyword,
+                        );
+                    }
                 };
-
-                let Some(function_binding_id) = checker.semantic().current_scope().get(id.as_str())
-                else {
-                    return;
-                };
-
-                for (arg_index, arg) in args.iter().enumerate() {
-                    information_flow::rules::check_implicit_arg_value(
-                        checker,
-                        function_binding_id,
-                        arg,
-                        arg_index,
-                    );
-                }
-
-                for keyword in keywords.iter() {
-                    information_flow::rules::check_implicit_keyword_value(
-                        checker,
-                        function_binding_id,
-                        keyword,
-                    );
-                }
             }
 
             if checker.any_enabled(&[
