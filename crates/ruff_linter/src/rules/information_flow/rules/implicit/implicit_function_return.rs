@@ -57,7 +57,7 @@ impl Violation for IFImplicitFunctionReturn {
 pub(crate) fn implicit_function_return(checker: &mut Checker, stmt: &Stmt) {
     if let Stmt::Return(StmtReturn { value, range }) = stmt {
         if let Some(value) = value {
-            let return_label = get_label_for_expression(checker, value);
+            let return_label = get_label_for_expression(checker.semantic(), checker.information_flow(), value);
 
             // Get function label
             let ScopeKind::Function(StmtFunctionDef { name: fn_name, .. }) =

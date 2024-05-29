@@ -86,7 +86,11 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
             }
         }
         Expr::Name(name_target) => {
-            let target_label = get_variable_label_by_name(checker, name_target);
+            let target_label = get_variable_label_by_name(
+                checker.semantic(),
+                checker.information_flow(),
+                name_target,
+            );
             let pc = checker.information_flow().get_pc_label();
 
             if let Some(target_label) = target_label {

@@ -1,86 +1,97 @@
+use super::information_flow_state::InformationFlowState;
 use super::label::Label;
-use crate::checkers::ast::Checker;
-use ruff_python_ast::ExprName;
+use itertools::Itertools;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
     ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
+use ruff_python_ast::{ExprName, Stmt};
+use ruff_python_semantic::SemanticModel;
 
 /// Fetch the label of a variable in the given scope
-pub(crate) fn get_variable_label_by_name(checker: &mut Checker, name: &ExprName) -> Option<Label> {
+pub(crate) fn get_variable_label_by_name(
+    semantic: &SemanticModel,
+    information_flow: &InformationFlowState,
+    name: &ExprName,
+) -> Option<Label> {
     // Get shadowed [BindingId] from [Scope] if it exists. We only have to check shadowed bindings,
     // because otherwise the variable is new and does not have a label
-    if let Some(binding_id) = checker.semantic().current_scope().get(name.id.as_str()) {
-        return checker
-            .semantic()
+    if let Some(binding_id) = semantic.current_scope().get(name.id.as_str()) {
+        return semantic
             .current_scope()
             .shadowed_bindings(binding_id)
-            .find_map(|bid| checker.information_flow().get_label(bid));
+            .find_map(|bid| information_flow.get_label(bid));
     }
 
     None
 }
 
-pub(crate) fn get_most_restrictive_label_from_list_of_expressions(
-    checker: &mut Checker,
+pub(crate) fn get_combination_of_labels_from_list_of_labels(labels: Vec<Option<Label>>) -> Label {
+    let mut curr_label: Label = Label::new_public();
+    for label in labels.into_iter().flatten() {
+        curr_label += label;
+    }
+
+    curr_label
+}
+
+pub(crate) fn get_list_of_labels_labels(
+    semantic: &SemanticModel,
+    information_flow: &InformationFlowState,
     expressions: &Vec<Expr>,
-) -> Option<Label> {
-    let mut curr_label: Option<Label> = None;
-    for expr in expressions {
-        if let Some(expr_label) = get_label_for_expression(checker, &expr) {
-            if let Some(label) = curr_label.clone() {
-                if expr_label < label {
-                    curr_label = Some(expr_label);
-                }
-            } else {
-                curr_label = Some(expr_label);
-            }
-        }
-    }
-
-    if let Some(curr_label) = curr_label.clone() {
-        return Some(curr_label.clone());
-    }
-
-    None
+) -> Vec<Option<Label>> {
+    expressions
+        .iter()
+        .map(|expr| get_label_for_expression(semantic, information_flow, expr))
+        .collect_vec()
 }
 
-pub(crate) fn get_higher_of_two_labels(
-    label1: Option<Label>,
-    label2: Option<Label>,
+pub(crate) fn get_label_from_statement(
+    semantic: &SemanticModel,
+    information_flow: &InformationFlowState,
+    stmt: &Stmt,
 ) -> Option<Label> {
-    if label1.is_none() {
-        label2
-    } else if label2.is_none() {
-        label1
+    if let Some(expr) = match stmt {
+        Stmt::Assign(assign) => Some(&assign.value),
+        Stmt::AnnAssign(ann_assign) => ann_assign.value.as_ref(),
+        Stmt::AugAssign(aug_assign) => Some(&aug_assign.value),
+        _ => None,
+    } {
+        get_label_for_expression(semantic, information_flow, expr)
     } else {
-        if label1.clone().unwrap() < label2.clone().unwrap() {
-            label2
-        } else {
-            label1
-        }
+        None
     }
 }
 
 /// Get the label of an expression.
 /// Returns the most restrictive label found in the expression
 /// TODO: Return the range as well and name for a more detailed error message
-pub(crate) fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Option<Label> {
+pub(crate) fn get_label_for_expression(
+    semantic: &SemanticModel,
+    information_flow: &InformationFlowState,
+    expr: &Expr,
+) -> Option<Label> {
     match expr {
-        Expr::Name(name) => get_variable_label_by_name(checker, name), // Get label from variable
-        Expr::Subscript(ExprSubscript { slice, .. }) => get_label_for_expression(checker, slice),
-        Expr::UnaryOp(ExprUnaryOp { operand, .. }) => get_label_for_expression(checker, operand),
+        Expr::Name(name) => get_variable_label_by_name(semantic, information_flow, name), // Get label from variable
+        Expr::Subscript(ExprSubscript { slice, .. }) => {
+            get_label_for_expression(semantic, information_flow, slice)
+        }
+        Expr::UnaryOp(ExprUnaryOp { operand, .. }) => {
+            get_label_for_expression(semantic, information_flow, operand)
+        }
         Expr::Named(ExprNamed {
             target: left,
             value: right,
             ..
         })
         | Expr::BinOp(ExprBinOp { left, right, .. }) => {
-            let left_label = get_label_for_expression(checker, left);
-            let right_label = get_label_for_expression(checker, right);
+            let left_label = get_label_for_expression(semantic, information_flow, left);
+            let right_label = get_label_for_expression(semantic, information_flow, right);
 
-            // Return the label that is more restrictive
-            get_higher_of_two_labels(left_label, right_label)
+            Some(get_combination_of_labels_from_list_of_labels(vec![
+                left_label,
+                right_label,
+            ]))
         }
 
         Expr::Slice(ExprSlice {
@@ -89,21 +100,24 @@ pub(crate) fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Op
             let lower_label = if lower.is_none() {
                 None
             } else {
-                get_label_for_expression(checker, lower.as_ref().unwrap())
+                get_label_for_expression(semantic, information_flow, lower.as_ref().unwrap())
             };
             let upper_label = if upper.is_none() {
                 None
             } else {
-                get_label_for_expression(checker, upper.as_ref().unwrap())
+                get_label_for_expression(semantic, information_flow, upper.as_ref().unwrap())
             };
             let step_label = if step.is_none() {
                 None
             } else {
-                get_label_for_expression(checker, step.as_ref().unwrap())
+                get_label_for_expression(semantic, information_flow, step.as_ref().unwrap())
             };
 
-            let return_label = get_higher_of_two_labels(lower_label, upper_label);
-            get_higher_of_two_labels(return_label, step_label)
+            Some(get_combination_of_labels_from_list_of_labels(vec![
+                lower_label,
+                upper_label,
+                step_label,
+            ]))
         }
 
         // Expressions with dynamic number of values (i.e. a vector of expressions)
@@ -111,40 +125,53 @@ pub(crate) fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Op
         | Expr::Tuple(ExprTuple { elts: values, .. })
         | Expr::List(ExprList { elts: values, .. })
         | Expr::Set(ExprSet { elts: values, .. }) => {
-            get_most_restrictive_label_from_list_of_expressions(checker, values)
+            Some(get_combination_of_labels_from_list_of_labels(
+                get_list_of_labels_labels(semantic, information_flow, values),
+            ))
         }
 
         Expr::Dict(ExprDict { items, .. }) => {
-            let values: &Vec<Expr> = &items
+            let value_labels = items
                 .iter()
                 .map(|item| item.value.clone())
-                .collect::<Vec<_>>();
-            get_most_restrictive_label_from_list_of_expressions(checker, values)
+                .map(|value| get_label_for_expression(semantic, information_flow, &value))
+                .collect_vec();
+            Some(get_combination_of_labels_from_list_of_labels(value_labels))
         }
 
         Expr::Attribute(ExprAttribute { value, .. }) => {
             // Get label from object
-            get_label_for_expression(checker, value)
+            get_label_for_expression(semantic, information_flow, value)
         } // TODO: For now we only handle the object label. Handle attribute individual attributes expressions (i.e. attributes from classes)
 
         Expr::Compare(ExprCompare {
             left, comparators, ..
         }) => {
-            let left_label = get_label_for_expression(checker, left);
-            let right_label =
-                get_most_restrictive_label_from_list_of_expressions(checker, &comparators.to_vec());
+            let left_label = get_label_for_expression(semantic, information_flow, left);
+            let right_label = get_combination_of_labels_from_list_of_labels(
+                comparators
+                    .into_iter()
+                    .map(|e| get_label_for_expression(semantic, information_flow, e))
+                    .collect_vec(),
+            );
 
-            get_higher_of_two_labels(left_label, right_label)
+            Some(get_combination_of_labels_from_list_of_labels(vec![
+                left_label,
+                Some(right_label),
+            ]))
         }
         Expr::If(ExprIf {
             body, test, orelse, ..
         }) => {
-            let test_label = get_label_for_expression(checker, test);
-            let body_label = get_label_for_expression(checker, body);
-            let orelse_label = get_label_for_expression(checker, orelse);
+            let test_label = get_label_for_expression(semantic, information_flow, test);
+            let body_label = get_label_for_expression(semantic, information_flow, body);
+            let orelse_label = get_label_for_expression(semantic, information_flow, orelse);
 
-            let return_label = get_higher_of_two_labels(body_label, orelse_label);
-            get_higher_of_two_labels(return_label, test_label)
+            Some(get_combination_of_labels_from_list_of_labels(vec![
+                test_label,
+                body_label,
+                orelse_label,
+            ]))
         }
 
         // Comprehensions
@@ -154,9 +181,13 @@ pub(crate) fn get_label_for_expression(checker: &mut Checker, expr: &Expr) -> Op
         Expr::Generator(_) => None,
 
         // Functions
-        Expr::Call(ExprCall { func, .. }) => get_label_for_expression(checker, func),
+        Expr::Call(ExprCall { func, .. }) => {
+            get_label_for_expression(semantic, information_flow, func)
+        }
         Expr::Lambda(_) => None, // TODO: Handle lambda expressions
-        Expr::Await(ExprAwait { value, .. }) => get_label_for_expression(checker, value), // Will go to the function expressions
+        Expr::Await(ExprAwait { value, .. }) => {
+            get_label_for_expression(semantic, information_flow, value)
+        } // Will go to the function expressions
 
         Expr::YieldFrom(_) | Expr::Yield(_) => None, // TODO: Handle yield expressions if needed
 

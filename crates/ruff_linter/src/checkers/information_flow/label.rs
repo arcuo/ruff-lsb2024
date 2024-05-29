@@ -1,6 +1,11 @@
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::str::FromStr;
+use rustc_hash::FxHashSet;
+use std::{
+    ops::{Add, AddAssign},
+    str::FromStr,
+};
 
 lazy_static! {
     static ref LABEL_REGEX: Regex =
@@ -12,12 +17,14 @@ lazy_static! {
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]
 pub(crate) struct Label {
-    pub(crate) principals: Vec<String>,
+    pub(crate) principals: FxHashSet<String>,
 }
 
 impl Label {
     pub(crate) fn new(principals: Vec<String>) -> Self {
-        Self { principals }
+        Self {
+            principals: FxHashSet::from_iter(principals.into_iter()),
+        }
     }
 
     pub(crate) fn is_public(&self) -> bool {
@@ -26,14 +33,16 @@ impl Label {
 
     #[allow(dead_code)]
     pub(crate) fn new_public() -> Self {
-        Self { principals: vec![] }
+        Self {
+            principals: FxHashSet::default(),
+        }
     }
 
     pub(crate) fn to_string(&self) -> String {
         if self.is_public() {
             return "{}".to_string();
         }
-        let principals = self.principals.join(", ");
+        let principals = self.principals.iter().join(", ");
         format!("{{{}}}", principals)
     }
 
@@ -97,6 +106,57 @@ impl PartialOrd for Label {
     fn ge(&self, other: &Self) -> bool {
         self == other || self.gt(other)
     }
+}
+
+impl Add for Label {
+    type Output = Label;
+
+    fn add(self, other: Label) -> Self::Output {
+        let mut principals = self.principals.clone();
+        principals.extend(other.principals.clone());
+        Label { principals }
+    }
+}
+
+impl AddAssign for Label {
+    fn add_assign(&mut self, other: Label) {
+        self.principals.extend(other.principals)
+    }
+}
+
+impl<'a> Add<&'a Label> for Label {
+    type Output = Label;
+
+    fn add(mut self, other: &'a Label) -> Self::Output {
+        self.principals.extend(other.principals.clone());
+        self
+    }
+}
+
+impl<'a> AddAssign<&'a Label> for Label {
+    fn add_assign(&mut self, other: &'a Label) {
+        self.principals.extend(other.principals.clone())
+    }
+}
+
+#[test]
+fn add_labels() {
+    let a = &Label::new(vec!["alice".to_string()]);
+    let b = &Label::new(vec!["bob".to_string()]);
+    let ab = &Label::new(vec!["alice".to_string(), "bob".to_string()]);
+    let p = &Label::new_public();
+
+    assert_eq!(a.clone() + b, ab.clone());
+    assert_eq!(a.clone() + p, a.clone());
+    assert_eq!(p.clone() + a, a.clone());
+
+    assert_eq!(a.clone() + a, a.clone());
+    assert_eq!(b.clone() + b, b.clone());
+    assert_eq!(p.clone() + p, p.clone());
+
+    assert_eq!(ab.clone() + a, ab.clone());
+    assert_eq!(ab.clone() + b, ab.clone());
+    assert_eq!(ab.clone() + p, ab.clone());
 }
 
 #[test]
@@ -163,12 +223,13 @@ impl FromStr for Label {
         match LABEL_REGEX.captures(string) {
             Some(captures) => match captures.name("label") {
                 Some(label) => {
-                    let principals = label
-                        .as_str()
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect::<Vec<String>>();
+                    let principals = FxHashSet::from_iter(
+                        label
+                            .as_str()
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty()),
+                    );
                     Ok(Label { principals })
                 }
                 None => Ok(Label::new_public()),

@@ -60,11 +60,7 @@ pub(crate) fn inconfidential_assign_targets_statement(
 
 /// IF101
 /// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking implicit flow)
-pub(crate) fn illegal_assign_target_statement(
-    checker: &mut Checker,
-    target: &Expr,
-    value: &Expr,
-) {
+pub(crate) fn illegal_assign_target_statement(checker: &mut Checker, target: &Expr, value: &Expr) {
     match target {
         Expr::Tuple(ExprTuple { elts, .. }) => {
             for element in elts {
@@ -72,9 +68,15 @@ pub(crate) fn illegal_assign_target_statement(
             }
         }
         Expr::Name(target_name) => {
-            let target_label = get_variable_label_by_name(checker, target_name);
+            let target_label = get_variable_label_by_name(
+                checker.semantic(),
+                checker.information_flow(),
+                target_name,
+            );
 
-            if let Some(value_label) = get_label_for_expression(checker, value) {
+            if let Some(value_label) =
+                get_label_for_expression(checker.semantic(), checker.information_flow(), value)
+            {
                 if value_label.is_public() {
                     return;
                 }
@@ -92,7 +94,6 @@ pub(crate) fn illegal_assign_target_statement(
                             target.range(),
                         ));
                     }
-                    
                 }
             }
         }

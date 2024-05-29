@@ -362,7 +362,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         ) => {
             if checker.enabled(Rule::IFImplicitArgument) {
                 let Expr::Name(ExprName { id, .. }) = func.as_ref() else {
-                    unreachable!("Expected a name expression")
+                    unreachable!("Expected a name expression") // TODO: error here
                 };
 
                 let Some(function_binding_id) = checker.semantic().current_scope().get(id.as_str())

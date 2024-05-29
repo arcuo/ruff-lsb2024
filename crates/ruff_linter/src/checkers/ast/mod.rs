@@ -926,7 +926,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Stmt::For(ast::StmtFor { iter, .. }) => {
                 // For information flow, handle block PC (Implicit)
-                if let Some(label) = get_label_for_expression(self, iter) {
+                if let Some(label) =
+                    get_label_for_expression(&self.semantic, &self.information_flow, iter)
+                {
                     self.information_flow.push_pc(label.clone(), iter.range());
                 }
 
@@ -1811,7 +1813,8 @@ impl<'a> Checker<'a> {
         self.semantic.flags = snapshot;
 
         // Get label of the statement and add to information_flow.pc
-        if let Some(label) = get_label_for_expression(self, expr) {
+        if let Some(label) = get_label_for_expression(&self.semantic, &self.information_flow, expr)
+        {
             self.information_flow.push_pc(label, expr.range());
         }
     }
@@ -1848,14 +1851,6 @@ impl<'a> Checker<'a> {
 
         // Create the `Binding`.
         let binding_id = self.semantic.push_binding(range, kind.clone(), flags);
-
-        self.information_flow.add_binding_label(
-            kind,
-            binding_id,
-            range,
-            self.locator(),
-            self.indexer.comment_ranges(),
-        );
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {
@@ -1911,6 +1906,16 @@ impl<'a> Checker<'a> {
         // Add the binding to the scope.
         let scope = &mut self.semantic.scopes[scope_id];
         scope.add(name, binding_id);
+
+        // Add information flow label
+        self.information_flow.add_binding_label(
+            kind,
+            binding_id,
+            range,
+            &self.locator,
+            self.indexer.comment_ranges(),
+            &self.semantic,
+        );
 
         binding_id
     }

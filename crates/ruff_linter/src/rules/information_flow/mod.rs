@@ -17,6 +17,7 @@ mod tests {
     #[test_case(Rule::IFMissingPrincipal, Path::new("IF002.py"))]
     // Explicit
     #[test_case(Rule::IFExplicitVariableAssign, Path::new("IF101/IF101_var.py"))]
+    #[test_case(Rule::IFExplicitVariableAssign, Path::new("IF101/IF101_inherit.py"))]
     #[test_case(Rule::IFExplicitVariableAssign, Path::new("IF101/IF101_expr.py"))]
     #[test_case(Rule::IFExplicitVariableAssign, Path::new("IF101/IF101_fun.py"))]
     #[test_case(Rule::IFExplicitVariableAssign, Path::new("IF101/IF101_ann.py"))]

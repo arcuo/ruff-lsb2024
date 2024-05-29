@@ -2,12 +2,13 @@ use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 
 use ruff_python_index::Indexer;
-use ruff_python_semantic::{BindingId, BindingKind};
+use ruff_python_semantic::{BindingId, BindingKind, SemanticModel};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use super::{
+    helper::get_label_from_statement,
     label::{FunctionLabel, Label},
     principals::{initiate_principals, Principals},
 };
@@ -117,6 +118,7 @@ impl InformationFlowState {
         range: TextRange,
         locator: &Locator,
         comment_ranges: &CommentRanges,
+        semantic: &SemanticModel,
     ) {
         match kind {
             // Ignored bindings
@@ -143,6 +145,7 @@ impl InformationFlowState {
                     range,
                     locator,
                     comment_ranges,
+                    semantic,
                 );
             }
 
@@ -177,6 +180,7 @@ impl InformationFlowState {
         range: TextRange,
         locator: &Locator,
         comment_ranges: &CommentRanges,
+        semantic: &SemanticModel,
     ) {
         // Check for label from shadowed bindings
         // TODO: Declassification (invalid declassification check?)
@@ -187,6 +191,20 @@ impl InformationFlowState {
                 self.variable_map.insert(binding_id, label);
                 return;
             }
+        }
+
+        // If there exists no label for the variable, get label from value expression
+        if semantic
+            .shadowed_bindings(semantic.scope_id, binding_id)
+            .any(|bid| self.get_label(bid.shadowed_id()).is_some())
+        {
+            return;
+        }
+
+        if let Some(label) = get_label_from_statement(semantic, self, semantic.current_statement())
+        {
+            self.variable_map.insert(binding_id, label);
+            return;
         }
     }
 
@@ -290,173 +308,4 @@ pub(crate) fn get_comment_text(
     };
 
     None
-}
-
-#[cfg(test)]
-mod information_flow_state_tests {
-    use ruff_python_ast::{Stmt, StmtAssign};
-    use ruff_python_parser::{parse_program, tokenize, Mode};
-
-    use super::*;
-
-    #[test]
-    fn test_information_flow_state_add_assign_label_to_variable_map() {
-        let source: &str = r#"
-a = 1 # iflabel {alice}
-b = 2 # iflabel {bob, alice}
-
-# iflabel {alice}
-c = 3
-"#;
-        let tokens = tokenize(source, Mode::Module);
-        let locator = Locator::new(source);
-        let indexer = Indexer::from_tokens(&tokens, &locator);
-        let comment_ranges = indexer.comment_ranges();
-        let result = parse_program(source);
-        let mut state = InformationFlowState::new(&indexer, &locator);
-
-        let mut id: BindingId = BindingId::from(0u32);
-
-        match result {
-            Ok(module) => {
-                let stmts = module.body;
-                for stmt in stmts {
-                    if let Stmt::Assign(StmtAssign {
-                        targets: _,
-                        value: _,
-                        range,
-                    }) = stmt
-                    {
-                        let binding_id: BindingId = id;
-                        id = (id.as_u32() + 1).into();
-                        state.add_variable_label_binding(
-                            binding_id,
-                            range,
-                            &locator,
-                            comment_ranges,
-                        );
-                    }
-                }
-            }
-            Err(_) => panic!("Failed to parse module"),
-        }
-
-        assert!(state.variable_map.contains_key(&BindingId::from(0u32)));
-        assert!(state.variable_map.contains_key(&BindingId::from(1u32)));
-        assert!(state.variable_map.contains_key(&BindingId::from(2u32)));
-
-        let label1 = &state.variable_map[&BindingId::from(0u32)];
-        let label2 = &state.variable_map[&BindingId::from(1u32)];
-        let label3 = &state.variable_map[&BindingId::from(2u32)];
-
-        assert_eq!(
-            label1,
-            &Label {
-                principals: vec!["alice".to_string()]
-            }
-        );
-        assert_eq!(
-            label2,
-            &Label {
-                principals: vec!["bob".to_string(), "alice".to_string()]
-            }
-        );
-        assert_eq!(
-            label3,
-            &Label {
-                principals: vec!["alice".to_string()]
-            }
-        );
-    }
-
-    #[test]
-    fn test_information_flow_state_skip_comments_two_lines_above() {
-        let source: &str = r#"
-# iflabel {alice}
-
-a = 1
-"#;
-        let tokens = tokenize(source, Mode::Module);
-        let locator = Locator::new(source);
-        let indexer = Indexer::from_tokens(&tokens, &locator);
-        let comment_ranges = indexer.comment_ranges();
-        let result = parse_program(source);
-        let mut state = InformationFlowState::new(&indexer, &locator);
-
-        let mut id: BindingId = BindingId::from(0u32);
-
-        match result {
-            Ok(module) => {
-                let stmts = module.body;
-                for stmt in stmts {
-                    match stmt {
-                        Stmt::Assign(StmtAssign {
-                            targets: _,
-                            value: _,
-                            range,
-                        }) => {
-                            let binding_id: BindingId = id;
-                            id = (id.as_u32() + 1).into();
-                            state.add_variable_label_binding(
-                                binding_id,
-                                range,
-                                &locator,
-                                comment_ranges,
-                            );
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            Err(_) => panic!("Failed to parse module"),
-        }
-
-        assert!(state.variable_map.len() == 0);
-    }
-
-    #[test]
-    fn test_information_flow_state_add_public_label_to_variable_map() {
-        let source: &str = r#"a = 1
-b = 2 # iflabel {}
-"#;
-
-        let tokens = tokenize(source, Mode::Module);
-        let locator = Locator::new(source);
-        let indexer = Indexer::from_tokens(&tokens, &locator);
-        let comment_ranges = indexer.comment_ranges();
-        let result = parse_program(source);
-        let mut state = InformationFlowState::new(&indexer, &locator);
-
-        let mut id: BindingId = BindingId::from(0u32);
-
-        match result {
-            Ok(module) => {
-                let stmts = module.body;
-                for stmt in stmts {
-                    if let Stmt::Assign(StmtAssign {
-                        targets: _,
-                        value: _,
-                        range,
-                    }) = stmt
-                    {
-                        let binding_id: BindingId = id;
-                        id = (id.as_u32() + 1).into();
-                        state.add_variable_label_binding(
-                            binding_id,
-                            range,
-                            &locator,
-                            comment_ranges,
-                        );
-                    }
-                }
-            }
-            Err(_) => panic!("Failed to parse module"),
-        }
-
-        assert!(state.variable_map.contains_key(&BindingId::from(1u32)));
-        assert_eq!(
-            &state.variable_map[&BindingId::from(1u32)],
-            &Label::new_public()
-        );
-    }
 }

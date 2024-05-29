@@ -63,7 +63,8 @@ pub(crate) fn check_implicit_arg_value(
         .get_parameter_label_by_index(function_binding_id, arg_index)
         .unwrap_or_default();
 
-    let arg_label = get_label_for_expression(checker, arg).unwrap_or_default();
+    let arg_label = get_label_for_expression(checker.semantic(), checker.information_flow(), arg)
+        .unwrap_or_default();
 
     if !(arg_label <= defined_arg_label) {
         let diagnostic = Diagnostic::new(
@@ -94,7 +95,9 @@ pub(crate) fn check_implicit_keyword_value(
         return;
     };
 
-    let arg_label = get_label_for_expression(checker, &kw.value).unwrap_or_default();
+    let arg_label =
+        get_label_for_expression(checker.semantic(), checker.information_flow(), &kw.value)
+            .unwrap_or_default();
 
     if !(arg_label <= defined_arg_label) {
         let diagnostic = Diagnostic::new(
