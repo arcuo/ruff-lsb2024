@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF202.py:19:3: IF202 Invalid confidentiality and integrity implicit argument flow: The returned value bob_return@{bob} is in another branch than the defined return label {alice}
+IF202.py:19:3: IF202 Invalid confidentiality implicit argument flow: bob_return@{bob} > {alice}
    |
 17 |   bob_return = 2 # iflabel {bob}
 18 | 

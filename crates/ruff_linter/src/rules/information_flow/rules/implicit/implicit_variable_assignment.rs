@@ -126,6 +126,12 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
                     return;
                 }
 
+                let shown_property = if security_property.is_both() {
+                    property
+                } else {
+                    security_property.clone()
+                };
+
                 let pc_expr_range = checker.information_flow().get_pc_expr_range();
                 #[allow(deprecated)]
                 checker.diagnostics.push(Diagnostic::new(
@@ -136,7 +142,7 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
                             .locator()
                             .compute_line_index(pc_expr_range.start()),
                         pc,
-                        property,
+                        property: shown_property,
                     },
                     target.range(),
                 ));

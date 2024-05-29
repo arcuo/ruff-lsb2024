@@ -112,12 +112,18 @@ pub(crate) fn implicit_function_return(
                     return;
                 }
 
+                let shown_property = if security_property.is_both() {
+                    property
+                } else {
+                    security_property.clone()
+                };
+
                 checker.diagnostics.push(Diagnostic::new(
                     IFImplicitFunctionReturn {
                         defined_return_label: defined_return_label.unwrap_or_default(),
                         return_label: return_label.unwrap_or_default(),
                         return_expr: checker.locator().slice(value.range()).to_string(),
-                        property,
+                        property: shown_property,
                     },
                     range.clone(),
                 ));

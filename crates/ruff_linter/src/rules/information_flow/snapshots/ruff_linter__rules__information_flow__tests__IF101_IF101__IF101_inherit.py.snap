@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF101_inherit.py:8:1: IF101 Invalid confidentiality and integrity explicit flow: The target a@{alice} is in another branch than the value b2@{bob}
+IF101_inherit.py:8:1: IF101 Invalid confidentiality explicit flow: a@{alice} < b2@{bob}
    |
  6 | b2 = b + 1 # should have Bob's label
  7 | 

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[serde(rename_all = "lowercase")]
 #[derive(Default, Debug, Eq, PartialEq, Clone, CacheKey, Deserialize, Serialize)]
 pub enum SecurityProperty {
     #[default]

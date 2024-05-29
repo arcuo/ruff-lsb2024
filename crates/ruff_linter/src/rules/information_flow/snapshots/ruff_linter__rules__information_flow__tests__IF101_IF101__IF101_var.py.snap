@@ -29,7 +29,7 @@ IF101_var.py:20:1: IF101 Invalid confidentiality explicit flow: public_var@{} < 
 22 | # Fail
    |
 
-IF101_var.py:23:1: IF101 Invalid confidentiality and integrity explicit flow: The target alice_var@{alice} is in another branch than the value bob_var@{bob}
+IF101_var.py:23:1: IF101 Invalid confidentiality explicit flow: alice_var@{alice} < bob_var@{bob}
    |
 22 | # Fail
 23 | alice_var = bob_var

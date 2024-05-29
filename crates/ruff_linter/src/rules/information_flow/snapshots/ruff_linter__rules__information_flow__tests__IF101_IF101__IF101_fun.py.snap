@@ -9,7 +9,7 @@ IF101_fun.py:12:3: IF101 Invalid confidentiality explicit flow: var2@{} < a@{ali
 13 |   var2 = a # iflabel {bob}
    |
 
-IF101_fun.py:13:3: IF101 Invalid confidentiality and integrity explicit flow: The target var2@{bob} is in another branch than the value a@{alice}
+IF101_fun.py:13:3: IF101 Invalid confidentiality explicit flow: var2@{bob} < a@{alice}
    |
 11 |   # Fail
 12 |   var2 = a # iflabel {}
@@ -27,7 +27,7 @@ IF101_fun.py:20:3: IF101 Invalid confidentiality explicit flow: var4@{} < b@{bob
 21 |   var4 = b # iflabel {alice}
    |
 
-IF101_fun.py:21:3: IF101 Invalid confidentiality and integrity explicit flow: The target var4@{alice} is in another branch than the value b@{bob}
+IF101_fun.py:21:3: IF101 Invalid confidentiality explicit flow: var4@{alice} < b@{bob}
    |
 19 |   # Fail
 20 |   var4 = b # iflabel {}

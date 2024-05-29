@@ -100,6 +100,12 @@ pub(crate) fn check_implicit_arg_value(
         return;
     }
 
+    let shown_property = if security_property.is_both() {
+        property
+    } else {
+        security_property.clone()
+    };
+
     let expr_string = checker.locator().slice(arg.range()).to_string();
 
     let diagnostic = Diagnostic::new(
@@ -108,7 +114,7 @@ pub(crate) fn check_implicit_arg_value(
             arg_label,
             argname: argname.to_string(),
             defined_arg_label,
-            property,
+            property: shown_property,
         },
         arg.range(),
     );
@@ -154,7 +160,14 @@ pub(crate) fn check_implicit_keyword_value(
     if security_property.skip_diagnostic(&property) {
         return;
     }
+
     let expr_string = checker.locator().slice(kw.value.range()).to_string();
+
+    let shown_property = if security_property.is_both() {
+        property
+    } else {
+        security_property.clone()
+    };
 
     let diagnostic = Diagnostic::new(
         IFImplicitArgument {
@@ -162,7 +175,7 @@ pub(crate) fn check_implicit_keyword_value(
             argname: arg.as_str().to_string(),
             arg_label,
             defined_arg_label,
-            property,
+            property: shown_property,
         },
         kw.value.range(),
     );

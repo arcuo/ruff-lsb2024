@@ -464,6 +464,18 @@
         }
       ]
     },
+    "information-flow": {
+      "description": "Options for the `information_flow` plugin.",
+      "deprecated": true,
+      "anyOf": [
+        {
+          "$ref": "#/definitions/InformationFlowOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "isort": {
       "description": "Options for the `isort` plugin.",
       "deprecated": true,
@@ -1468,6 +1480,23 @@
       "format": "uint8",
       "minimum": 1.0
     },
+    "InformationFlowOptions": {
+      "type": "object",
+      "properties": {
+        "security-property": {
+          "description": "Whether to check for confidentiality, integrity or both for information flow\n\n```python a = 1 # iflabel {alice} p = 1 # iflabel {}\n\na = p # Integrity issue as a is owned by alice while p is public and untrusted p = a # Confidentiality issue as p is public while a is owned by alice ```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SecurityProperty"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "IsortOptions": {
       "type": "object",
       "properties": {
@@ -2123,6 +2152,17 @@
           "type": [
             "boolean",
             "null"
+          ]
+        },
+        "information-flow": {
+          "description": "Options for the `information_flow` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InformationFlowOptions"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "isort": {
@@ -3941,6 +3981,14 @@
         "YTT301",
         "YTT302",
         "YTT303"
+      ]
+    },
+    "SecurityProperty": {
+      "type": "string",
+      "enum": [
+        "confidentiality",
+        "integrity",
+        "both"
       ]
     },
     "SerializationFormat": {

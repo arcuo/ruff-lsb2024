@@ -120,13 +120,19 @@ pub(crate) fn illegal_assign_target_statement(
                         return;
                     }
 
+                    let shown_property = if security_property.is_both() {
+                        property
+                    } else {
+                        security_property.clone()
+                    };
+
                     checker.diagnostics.push(Diagnostic::new(
                         IFExplicitVariableAssign {
                             target: target_name.id.clone(),
                             target_label,
                             value: checker.locator().slice(value.range()).to_string(),
                             value_label,
-                            property,
+                            property: shown_property,
                         },
                         target.range(),
                     ));
