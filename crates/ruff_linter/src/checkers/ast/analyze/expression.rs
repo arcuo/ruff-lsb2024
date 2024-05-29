@@ -1,4 +1,3 @@
-use ast::ExprName;
 use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Operator};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
@@ -361,28 +360,24 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             },
         ) => {
             if checker.enabled(Rule::IFImplicitArgument) {
-                if let Expr::Name(ExprName { id, .. }) = func.as_ref() {
-                    let Some(function_binding_id) =
-                        checker.semantic().current_scope().get(id.as_str())
-                    else {
-                        return;
-                    };
+                if let Expr::Name(name) = func.as_ref() {
+                    if let Some(function_binding_id) = checker.semantic().resolve_name(name) {
+                        for (arg_index, arg) in args.iter().enumerate() {
+                            information_flow::rules::check_implicit_arg_value(
+                                checker,
+                                function_binding_id,
+                                arg,
+                                arg_index,
+                            );
+                        }
 
-                    for (arg_index, arg) in args.iter().enumerate() {
-                        information_flow::rules::check_implicit_arg_value(
-                            checker,
-                            function_binding_id,
-                            arg,
-                            arg_index,
-                        );
-                    }
-
-                    for keyword in keywords.iter() {
-                        information_flow::rules::check_implicit_keyword_value(
-                            checker,
-                            function_binding_id,
-                            keyword,
-                        );
+                        for keyword in keywords.iter() {
+                            information_flow::rules::check_implicit_keyword_value(
+                                checker,
+                                function_binding_id,
+                                keyword,
+                            );
+                        }
                     }
                 };
             }

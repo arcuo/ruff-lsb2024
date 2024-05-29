@@ -12,7 +12,7 @@ lazy_static! {
         Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
     static ref FUNCTION_LABEL_REGEX: Regex =
         Regex::new(r"iflabel\s+fn\s*\(\s*(?P<arg>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z]]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})?\s*\)\s*(\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)?\s*\})?").unwrap();
-    static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w])\s*:\s*\{(?P<label>[\w\s*,]+)?\}").unwrap();
+    static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w]+)\s*:\s*\{(?P<label>[\w\s*,]+)?\}").unwrap();
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Eq)]

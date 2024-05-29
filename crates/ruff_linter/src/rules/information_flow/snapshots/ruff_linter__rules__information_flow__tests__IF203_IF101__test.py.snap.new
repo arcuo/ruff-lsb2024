@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 49
+---
+test.py:11:12: IF203 Illegal implicit information flow. Argument "user" has label {user}, but the defined argument label is {server}
+   |
+ 9 | def on_request(userId, userCPR):
+10 |     # Log the user's request
+11 |     log_db(userCPR)
+   |            ^^^^^^^ IF203
+   |
