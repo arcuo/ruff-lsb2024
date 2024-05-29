@@ -368,6 +368,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 function_binding_id,
                                 arg,
                                 arg_index,
+                                &checker.settings.information_flow.security_property,
                             );
                         }
 
@@ -376,6 +377,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 checker,
                                 function_binding_id,
                                 keyword,
+                                &checker.settings.information_flow.security_property,
                             );
                         }
                     }

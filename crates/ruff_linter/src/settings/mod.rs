@@ -16,11 +16,7 @@ use ruff_macros::CacheKey;
 use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule};
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins,
-    flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext,
-    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
-    pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, information_flow, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade
 };
 use crate::settings::types::{
     CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet, PythonVersion,
@@ -265,6 +261,7 @@ pub struct LinterSettings {
     pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
+    pub information_flow: information_flow::settings::Settings,
 }
 
 impl Display for LinterSettings {
@@ -328,6 +325,7 @@ impl Display for LinterSettings {
                 self.pyflakes | nested,
                 self.pylint | nested,
                 self.pyupgrade | nested,
+                self.information_flow | nested,
             ]
         }
         Ok(())
@@ -428,6 +426,7 @@ impl LinterSettings {
             pyflakes: pyflakes::settings::Settings::default(),
             pylint: pylint::settings::Settings::default(),
             pyupgrade: pyupgrade::settings::Settings::default(),
+            information_flow: information_flow::settings::Settings::default(),
             preview: PreviewMode::default(),
             explicit_preview_rules: false,
             extension: ExtensionMapping::default(),

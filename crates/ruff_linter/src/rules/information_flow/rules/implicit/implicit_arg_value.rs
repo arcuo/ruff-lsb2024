@@ -9,12 +9,15 @@ use ruff_python_semantic::{BindingId, Scope, ScopeKind};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::TextRange;
 
-use crate::checkers::{
-    ast::Checker,
-    information_flow::{
-        helper::{get_label_for_expression, get_variable_label_by_name},
-        label::Label,
+use crate::{
+    checkers::{
+        ast::Checker,
+        information_flow::{
+            helper::{get_label_for_expression, get_variable_label_by_name},
+            label::Label,
+        },
     },
+    rules::information_flow::SecurityProperty,
 };
 
 /// ## What it does
@@ -39,15 +42,26 @@ use crate::checkers::{
 ///```
 #[violation]
 pub struct IFImplicitArgument {
-    argname: String,
+    expr_string: String,
     arg_label: Label,
+    argname: String,
     defined_arg_label: Label,
+    property: SecurityProperty,
 }
 
 impl Violation for IFImplicitArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Illegal implicit information flow. Argument \"{}\" has label {}, but the defined argument label is {}", self.argname, self.arg_label.to_string(), self.defined_arg_label.to_string())
+        format!(
+            "Invalid {} implicit argument flow: {}",
+            self.property.to_string(),
+            self.property.get_description(
+                &self.argname,
+                self.defined_arg_label.to_string(),
+                &self.expr_string,
+                self.arg_label.to_string(),
+            )
+        )
     }
 }
 
@@ -57,6 +71,7 @@ pub(crate) fn check_implicit_arg_value(
     function_binding_id: BindingId,
     arg: &Expr,
     arg_index: usize,
+    security_property: &SecurityProperty,
 ) {
     let (argname, defined_arg_label) = checker
         .information_flow()
@@ -66,23 +81,45 @@ pub(crate) fn check_implicit_arg_value(
     let arg_label = get_label_for_expression(checker.semantic(), checker.information_flow(), arg)
         .unwrap_or_default();
 
-    if !(arg_label <= defined_arg_label) {
-        let diagnostic = Diagnostic::new(
-            IFImplicitArgument {
-                argname: argname.to_string(),
-                arg_label,
-                defined_arg_label,
-            },
-            arg.range(),
-        );
-        checker.diagnostics.push(diagnostic);
+    if arg_label == defined_arg_label {
+        return;
     }
+
+    let property = if arg_label < defined_arg_label {
+        // arg_label is less trusted than defined_arg_label (integrity violation)
+        SecurityProperty::Integrity
+    } else if arg_label > defined_arg_label {
+        // arg is more trusted than defined_arg_label (confidentiality violation)
+        SecurityProperty::Confidentiality
+    } else {
+        // arg_label is in another branch than the defined_arg_label
+        SecurityProperty::Both
+    };
+
+    if security_property.skip_diagnostic(&property) {
+        return;
+    }
+
+    let expr_string = checker.locator().slice(arg.range()).to_string();
+
+    let diagnostic = Diagnostic::new(
+        IFImplicitArgument {
+            expr_string,
+            arg_label,
+            argname: argname.to_string(),
+            defined_arg_label,
+            property,
+        },
+        arg.range(),
+    );
+    checker.diagnostics.push(diagnostic);
 }
 
 pub(crate) fn check_implicit_keyword_value(
     checker: &mut Checker,
     function_binding_id: BindingId,
     kw: &Keyword,
+    security_property: &SecurityProperty,
 ) {
     let Some(arg) = &kw.arg else {
         return;
@@ -99,15 +136,35 @@ pub(crate) fn check_implicit_keyword_value(
         get_label_for_expression(checker.semantic(), checker.information_flow(), &kw.value)
             .unwrap_or_default();
 
-    if !(arg_label <= defined_arg_label) {
-        let diagnostic = Diagnostic::new(
-            IFImplicitArgument {
-                argname: arg.as_str().to_string(),
-                arg_label,
-                defined_arg_label,
-            },
-            kw.value.range(),
-        );
-        checker.diagnostics.push(diagnostic);
+    if arg_label == defined_arg_label {
+        return;
     }
+
+    let property = if arg_label < defined_arg_label {
+        // arg_label is less trusted than defined_arg_label (integrity violation)
+        SecurityProperty::Integrity
+    } else if arg_label > defined_arg_label {
+        // pc is more trusted than defined_arg_label (confidentiality violation)
+        SecurityProperty::Confidentiality
+    } else {
+        // arg_label is in another branch than the defined_arg_label
+        SecurityProperty::Both
+    };
+
+    if security_property.skip_diagnostic(&property) {
+        return;
+    }
+    let expr_string = checker.locator().slice(kw.value.range()).to_string();
+
+    let diagnostic = Diagnostic::new(
+        IFImplicitArgument {
+            expr_string,
+            argname: arg.as_str().to_string(),
+            arg_label,
+            defined_arg_label,
+            property,
+        },
+        kw.value.range(),
+    );
+    checker.diagnostics.push(diagnostic);
 }

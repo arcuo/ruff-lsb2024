@@ -45,9 +45,9 @@ use crate::options::{
     Flake8ErrMsgOptions, Flake8GetTextOptions, Flake8ImplicitStrConcatOptions,
     Flake8ImportConventionsOptions, Flake8PytestStyleOptions, Flake8QuotesOptions,
     Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
-    Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
-    McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydocstyleOptions, PyflakesOptions, PylintOptions,
+    Flake8UnusedArgumentsOptions, FormatOptions, InformationFlowOptions, IsortOptions,
+    LintCommonOptions, LintOptions, McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions,
+    PycodestyleOptions, PydocstyleOptions, PyflakesOptions, PylintOptions,
 };
 use crate::settings::{
     FileResolverSettings, FormatterSettings, LineEnding, Settings, EXCLUDE, INCLUDE,
@@ -394,6 +394,10 @@ impl Configuration {
                     .pyupgrade
                     .map(PyUpgradeOptions::into_settings)
                     .unwrap_or_default(),
+                information_flow: lint
+                    .information_flow
+                    .map(InformationFlowOptions::into_settings)
+                    .unwrap_or_default(),
             },
 
             formatter,
@@ -638,6 +642,7 @@ pub struct LintConfiguration {
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
     pub pyupgrade: Option<PyUpgradeOptions>,
+    pub information_flow: Option<InformationFlowOptions>,
 }
 
 impl LintConfiguration {
@@ -748,6 +753,7 @@ impl LintConfiguration {
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
             pyupgrade: options.common.pyupgrade,
+            information_flow: options.common.information_flow,
         })
     }
 
@@ -1161,6 +1167,7 @@ impl LintConfiguration {
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
+            information_flow: self.information_flow.combine(config.information_flow),
         }
     }
 }

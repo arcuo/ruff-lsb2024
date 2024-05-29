@@ -713,6 +713,14 @@ impl<'a> SemanticModel<'a> {
         self.resolved_names.get(&name.into()).copied()
     }
 
+    /// Ret the [`ast::Scope`]
+    pub fn get_binding_scope(&self, binding_id: BindingId) -> Option<&Scope<'a>> {
+        if let Some(binding) = self.bindings.get(binding_id) {
+            return self.scopes.get(binding.scope);
+        }
+        return None;
+    }
+
     /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if it's the
     /// only binding to that name in its scope.
     pub fn only_binding(&self, name: &ast::ExprName) -> Option<BindingId> {

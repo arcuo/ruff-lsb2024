@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF202.py:19:3: IF202 Illegal implicit information flow. Defined return label: {alice} is less than returned variable bob_return with label: {bob}
+IF202.py:19:3: IF202 Invalid confidentiality and integrity implicit argument flow: The returned value bob_return@{bob} is in another branch than the defined return label {alice}
    |
 17 |   bob_return = 2 # iflabel {bob}
 18 | 
@@ -11,7 +11,7 @@ IF202.py:19:3: IF202 Illegal implicit information flow. Defined return label: {a
 21 | # iflabel fn () {alice}
    |
 
-IF202.py:25:3: IF202 Illegal implicit information flow. Defined return label: {alice} is less than returned variable alice_bob_return with label: {alice, bob}
+IF202.py:25:3: IF202 Invalid confidentiality implicit argument flow: alice_bob_return@{alice, bob} > {alice}
    |
 23 |   alice_bob_return = 4 # iflabel {alice, bob}
 24 | 

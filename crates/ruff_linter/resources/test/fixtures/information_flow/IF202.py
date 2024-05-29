@@ -2,15 +2,15 @@
 
 # iflabel fn () {alice}
 def fn1():
-  alice_return = 1 # iflabel {alice}
-
-  return alice_return # Succeed
-
-# iflabel fn () {alice}
-def fn2():
   public_return = 3 # iflabel {}
 
   return public_return # Succeed
+
+# iflabel fn () {alice}
+def fn2():
+  alice_return = 1 # iflabel {alice}
+
+  return alice_return # Succeed
 
 # iflabel fn () {alice}
 def fn3():

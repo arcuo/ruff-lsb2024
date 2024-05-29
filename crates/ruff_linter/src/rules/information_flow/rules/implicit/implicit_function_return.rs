@@ -9,12 +9,15 @@ use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_source_file::OneIndexed;
 use ruff_text_size::TextRange;
 
-use crate::checkers::{
-    ast::Checker,
-    information_flow::{
-        helper::{get_label_for_expression, get_variable_label_by_name},
-        label::Label,
+use crate::{
+    checkers::{
+        ast::Checker,
+        information_flow::{
+            helper::{get_label_for_expression, get_variable_label_by_name},
+            label::Label,
+        },
     },
+    rules::information_flow::SecurityProperty,
 };
 
 /// ## What it does
@@ -44,20 +47,34 @@ pub struct IFImplicitFunctionReturn {
     defined_return_label: Label,
     return_expr: String,
     return_label: Label,
+    property: SecurityProperty,
 }
 
 impl Violation for IFImplicitFunctionReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Illegal implicit information flow. Defined return label: {} is less than returned variable {} with label: {}", self.defined_return_label.to_string(), self.return_expr, self.return_label.to_string())
+        format!(
+            "Invalid {} implicit argument flow: {}",
+            self.property.to_string(),
+            self.property.get_description_return(
+                &self.return_expr,
+                self.return_label.to_string(),
+                self.defined_return_label.to_string()
+            )
+        )
     }
 }
 
 /// IF202
-pub(crate) fn implicit_function_return(checker: &mut Checker, stmt: &Stmt) {
+pub(crate) fn implicit_function_return(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    security_property: &SecurityProperty,
+) {
     if let Stmt::Return(StmtReturn { value, range }) = stmt {
         if let Some(value) = value {
-            let return_label = get_label_for_expression(checker.semantic(), checker.information_flow(), value);
+            let return_label =
+                get_label_for_expression(checker.semantic(), checker.information_flow(), value);
 
             // Get function label
             let ScopeKind::Function(StmtFunctionDef { name: fn_name, .. }) =
@@ -76,16 +93,34 @@ pub(crate) fn implicit_function_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(fn_bid) = parent_scope.get(fn_name) {
                 let defined_return_label = checker.information_flow().get_label(fn_bid);
 
-                if !(return_label <= defined_return_label) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        IFImplicitFunctionReturn {
-                            defined_return_label: defined_return_label.unwrap_or_default(),
-                            return_label: return_label.unwrap_or_default(),
-                            return_expr: checker.locator().slice(value.range()).to_string(),
-                        },
-                        range.clone(),
-                    ));
+                if return_label == defined_return_label {
+                    return;
                 }
+
+                let property = if return_label < defined_return_label {
+                    // return_label is less trusted than defined_return_label (integrity violation)
+                    SecurityProperty::Integrity
+                } else if return_label > defined_return_label {
+                    // return_label is more trusted than defined_return_label (confidentiality violation)
+                    SecurityProperty::Confidentiality
+                } else {
+                    // return_label is in another branch than the defined_return_label
+                    SecurityProperty::Both
+                };
+
+                if security_property.skip_diagnostic(&property) {
+                    return;
+                }
+
+                checker.diagnostics.push(Diagnostic::new(
+                    IFImplicitFunctionReturn {
+                        defined_return_label: defined_return_label.unwrap_or_default(),
+                        return_label: return_label.unwrap_or_default(),
+                        return_expr: checker.locator().slice(value.range()).to_string(),
+                        property,
+                    },
+                    range.clone(),
+                ));
             }
         }
     }

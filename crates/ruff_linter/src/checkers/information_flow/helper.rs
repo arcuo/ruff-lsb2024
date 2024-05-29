@@ -16,14 +16,22 @@ pub(crate) fn get_variable_label_by_name(
 ) -> Option<Label> {
     // Get shadowed [BindingId] from [Scope] if it exists. We only have to check shadowed bindings,
     // because otherwise the variable is new and does not have a label
-    if let Some(binding_id) = semantic.current_scope().get(name.id.as_str()) {
-        return semantic
-            .current_scope()
+    let binding_id = if let Some(binding_id) = semantic.current_scope().get(name.id.as_str()) {
+        binding_id
+    } else if let Some(binding_id) = semantic.resolve_name(name) {
+        // check outer scopes for deferred functions
+        binding_id
+    } else {
+        return None;
+    };
+
+    if let Some(scope) = semantic.get_binding_scope(binding_id) {
+        return scope
             .shadowed_bindings(binding_id)
             .find_map(|bid| information_flow.get_label(bid));
+    } else {
+        None
     }
-
-    None
 }
 
 pub(crate) fn get_combination_of_labels_from_list_of_labels(labels: Vec<Option<Label>>) -> Label {

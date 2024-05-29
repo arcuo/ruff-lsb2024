@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF101_fun.py:12:3: IF101 Illegal explicit assignment to more restrictive variable. Target `var2` with label `{}` is being assigned to `a` with label `{alice}`
+IF101_fun.py:12:3: IF101 Invalid confidentiality explicit flow: var2@{} < a@{alice}
    |
 11 |   # Fail
 12 |   var2 = a # iflabel {}
@@ -9,7 +9,7 @@ IF101_fun.py:12:3: IF101 Illegal explicit assignment to more restrictive variabl
 13 |   var2 = a # iflabel {bob}
    |
 
-IF101_fun.py:13:3: IF101 Illegal explicit assignment to more restrictive variable. Target `var2` with label `{bob}` is being assigned to `a` with label `{alice}`
+IF101_fun.py:13:3: IF101 Invalid confidentiality and integrity explicit flow: The target var2@{bob} is in another branch than the value a@{alice}
    |
 11 |   # Fail
 12 |   var2 = a # iflabel {}
@@ -19,7 +19,7 @@ IF101_fun.py:13:3: IF101 Illegal explicit assignment to more restrictive variabl
 15 |   # Succeed
    |
 
-IF101_fun.py:20:3: IF101 Illegal explicit assignment to more restrictive variable. Target `var4` with label `{}` is being assigned to `b` with label `{bob}`
+IF101_fun.py:20:3: IF101 Invalid confidentiality explicit flow: var4@{} < b@{bob}
    |
 19 |   # Fail
 20 |   var4 = b # iflabel {}
@@ -27,7 +27,7 @@ IF101_fun.py:20:3: IF101 Illegal explicit assignment to more restrictive variabl
 21 |   var4 = b # iflabel {alice}
    |
 
-IF101_fun.py:21:3: IF101 Illegal explicit assignment to more restrictive variable. Target `var4` with label `{alice}` is being assigned to `b` with label `{bob}`
+IF101_fun.py:21:3: IF101 Invalid confidentiality and integrity explicit flow: The target var4@{alice} is in another branch than the value b@{bob}
    |
 19 |   # Fail
 20 |   var4 = b # iflabel {}
@@ -35,7 +35,7 @@ IF101_fun.py:21:3: IF101 Illegal explicit assignment to more restrictive variabl
    |   ^^^^ IF101
    |
 
-IF101_fun.py:33:1: IF101 Illegal explicit assignment to more restrictive variable. Target `public` with label `{}` is being assigned to `help(alice, public)` with label `{alice}`
+IF101_fun.py:33:1: IF101 Invalid confidentiality explicit flow: public@{} < help(alice, public)@{alice}
    |
 32 | # Checking return
 33 | public = help(alice, public) # Fail

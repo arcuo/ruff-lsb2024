@@ -7,12 +7,15 @@ use ruff_python_ast::{
 use ruff_source_file::OneIndexed;
 use ruff_text_size::TextRange;
 
-use crate::checkers::{
-    ast::Checker,
-    information_flow::{
-        helper::{get_label_for_expression, get_variable_label_by_name},
-        label::Label,
+use crate::{
+    checkers::{
+        ast::Checker,
+        information_flow::{
+            helper::{get_label_for_expression, get_variable_label_by_name},
+            label::Label,
+        },
     },
+    rules::information_flow::SecurityProperty,
 };
 
 /// ## What it does
@@ -38,12 +41,21 @@ pub struct IFImplicitVariableAssign {
     target_label: Label,
     pc_expr_line_number: OneIndexed,
     pc: Label,
+    property: SecurityProperty,
 }
 
 impl Violation for IFImplicitVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Illegal implicit information flow. Current pc label: {} is greater than target label: {}. Current pc set at line {}", self.pc.to_string(), self.target_label.to_string(), self.pc_expr_line_number)
+        format!(
+            "Invalid {} implicit flow: {}",
+            self.property.to_string(),
+            self.property.get_description_pc(
+                &self.target,
+                self.target_label.to_string(),
+                self.pc.to_string()
+            )
+        )
     }
 }
 
@@ -52,14 +64,10 @@ impl Violation for IFImplicitVariableAssign {
 pub(crate) fn implicit_inconfidential_assign_targets_statement(
     checker: &mut Checker,
     targets: &Vec<Expr>,
+    security_property: &SecurityProperty,
 ) {
-    // if pc is public, no need to check.
-    if checker.information_flow().get_pc_label().is_public() {
-        return;
-    }
-
     for target in targets {
-        implicit_inconfidential_assign_target_statement(checker, target);
+        implicit_inconfidential_assign_target_statement(checker, target, security_property);
     }
 }
 
@@ -73,6 +81,7 @@ pub(crate) fn implicit_inconfidential_assign_targets_statement(
 pub(crate) fn implicit_inconfidential_assign_target_statement(
     checker: &mut Checker,
     target: &Expr,
+    security_property: &SecurityProperty,
 ) {
     // if pc is public, no need to check.
     if checker.information_flow().get_pc_label().is_public() {
@@ -82,7 +91,11 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
     match target {
         Expr::Tuple(ExprTuple { elts, .. }) => {
             for element in elts {
-                implicit_inconfidential_assign_target_statement(checker, element);
+                implicit_inconfidential_assign_target_statement(
+                    checker,
+                    element,
+                    security_property,
+                );
             }
         }
         Expr::Name(name_target) => {
@@ -94,21 +107,39 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
             let pc = checker.information_flow().get_pc_label();
 
             if let Some(target_label) = target_label {
-                if !(pc <= target_label) {
-                    let pc_expr_range = checker.information_flow().get_pc_expr_range();
-                    #[allow(deprecated)]
-                    checker.diagnostics.push(Diagnostic::new(
-                        IFImplicitVariableAssign {
-                            target: name_target.id.clone(),
-                            target_label,
-                            pc_expr_line_number: checker
-                                .locator()
-                                .compute_line_index(pc_expr_range.start()),
-                            pc,
-                        },
-                        target.range(),
-                    ));
+                if pc == target_label {
+                    return;
                 }
+
+                let property = if pc < target_label {
+                    // pc is less trusted than target (integrity violation)
+                    SecurityProperty::Integrity
+                } else if pc > target_label {
+                    // pc is more trusted than target (confidentiality violation)
+                    SecurityProperty::Confidentiality
+                } else {
+                    // pc is in another branch than the target
+                    SecurityProperty::Both
+                };
+
+                if security_property.skip_diagnostic(&property) {
+                    return;
+                }
+
+                let pc_expr_range = checker.information_flow().get_pc_expr_range();
+                #[allow(deprecated)]
+                checker.diagnostics.push(Diagnostic::new(
+                    IFImplicitVariableAssign {
+                        target: name_target.id.clone(),
+                        target_label,
+                        pc_expr_line_number: checker
+                            .locator()
+                            .compute_line_index(pc_expr_range.start()),
+                        pc,
+                        property,
+                    },
+                    target.range(),
+                ));
             }
         }
         _ => {}

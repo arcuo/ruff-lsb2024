@@ -5,12 +5,15 @@ use ruff_python_ast::{
     ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
 
-use crate::checkers::{
-    ast::Checker,
-    information_flow::{
-        helper::{get_label_for_expression, get_variable_label_by_name},
-        label::Label,
+use crate::{
+    checkers::{
+        ast::Checker,
+        information_flow::{
+            helper::{get_label_for_expression, get_variable_label_by_name},
+            label::Label,
+        },
     },
+    rules::information_flow::settings::SecurityProperty,
 };
 
 /// ## What it does
@@ -32,39 +35,52 @@ use crate::checkers::{
 pub struct IFExplicitVariableAssign {
     target: String,
     target_label: Label,
-    expr: String,
-    expr_label: Label,
+    value: String,
+    value_label: Label,
+    property: SecurityProperty,
 }
 
 impl Violation for IFExplicitVariableAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Illegal explicit assignment to more restrictive variable. Target `{}` with label `{}` is being assigned to `{}` with label `{}`",
-            self.target, self.target_label.to_string(), self.expr, self.expr_label.to_string()
+            "Invalid {} explicit flow: {}",
+            self.property.to_string(),
+            self.property.get_description(
+                &self.target,
+                self.target_label.to_string(),
+                &self.value,
+                self.value_label.to_string()
+            )
         )
     }
 }
 
 // TODO
 /// IF101
-pub(crate) fn inconfidential_assign_targets_statement(
+pub(crate) fn check_if_assign_targets_statement(
     checker: &mut Checker,
     targets: &Vec<Expr>,
     value: &Expr,
+    security_property: &SecurityProperty,
 ) {
     for target in targets {
-        illegal_assign_target_statement(checker, target, value);
+        illegal_assign_target_statement(checker, target, value, security_property);
     }
 }
 
 /// IF101
 /// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking implicit flow)
-pub(crate) fn illegal_assign_target_statement(checker: &mut Checker, target: &Expr, value: &Expr) {
+pub(crate) fn illegal_assign_target_statement(
+    checker: &mut Checker,
+    target: &Expr,
+    value: &Expr,
+    security_property: &SecurityProperty,
+) {
     match target {
         Expr::Tuple(ExprTuple { elts, .. }) => {
             for element in elts {
-                illegal_assign_target_statement(checker, element, value);
+                illegal_assign_target_statement(checker, element, value, security_property);
             }
         }
         Expr::Name(target_name) => {
@@ -83,17 +99,37 @@ pub(crate) fn illegal_assign_target_statement(checker: &mut Checker, target: &Ex
 
                 // Value is not public, check if label(target) >= label(value)
                 if let Some(target_label) = target_label {
-                    if !(value_label <= target_label) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            IFExplicitVariableAssign {
-                                target: target_name.id.clone(),
-                                target_label,
-                                expr: checker.locator().slice(value.range()).to_string(),
-                                expr_label: value_label,
-                            },
-                            target.range(),
-                        ));
+                    if value_label == target_label {
+                        return;
                     }
+
+                    let property = if value_label < target_label {
+                        // Value is less trusted than target (integrity violation)
+                        SecurityProperty::Integrity
+                    } else if value_label > target_label {
+                        // Value is more confidential than target
+                        SecurityProperty::Confidentiality
+                    } else if value_label != target_label {
+                        // The labels are on different branches
+                        SecurityProperty::Both
+                    } else {
+                        unreachable!()
+                    };
+
+                    if security_property.skip_diagnostic(&property) {
+                        return;
+                    }
+
+                    checker.diagnostics.push(Diagnostic::new(
+                        IFExplicitVariableAssign {
+                            target: target_name.id.clone(),
+                            target_label,
+                            value: checker.locator().slice(value.range()).to_string(),
+                            value_label,
+                            property,
+                        },
+                        target.range(),
+                    ));
                 }
             }
         }

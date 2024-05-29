@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF201_assert.py:10:1: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 8
+IF201_assert.py:10:1: IF201 Invalid confidentiality implicit flow: public_var@{} < pc@{secret}
    |
  8 | assert secret_var > 0
  9 | 
@@ -11,7 +11,7 @@ IF201_assert.py:10:1: IF201 Illegal implicit information flow. Current pc label:
 12 | public_var: int = 2 # Fail
    |
 
-IF201_assert.py:11:1: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 8
+IF201_assert.py:11:1: IF201 Invalid confidentiality implicit flow: public_var@{} < pc@{secret}
    |
 10 | public_var = 0 # Fail
 11 | public_var += 1 # Fail
@@ -19,7 +19,7 @@ IF201_assert.py:11:1: IF201 Illegal implicit information flow. Current pc label:
 12 | public_var: int = 2 # Fail
    |
 
-IF201_assert.py:12:1: IF201 Illegal implicit information flow. Current pc label: {secret} is greater than target label: {}. Current pc set at line 8
+IF201_assert.py:12:1: IF201 Invalid confidentiality implicit flow: public_var@{} < pc@{secret}
    |
 10 | public_var = 0 # Fail
 11 | public_var += 1 # Fail

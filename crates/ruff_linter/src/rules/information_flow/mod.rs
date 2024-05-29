@@ -1,5 +1,8 @@
 //! Rules for information flow.
 pub(crate) mod rules;
+pub(crate) use settings::*;
+
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -9,6 +12,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::information_flow;
+    use crate::settings::types::PythonVersion;
     use crate::test::test_path;
     use crate::{assert_messages, settings};
 
@@ -37,14 +42,41 @@ mod tests {
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201/IF201_assert.py"))]
     #[test_case(Rule::IFImplicitFunctionReturn, Path::new("IF202.py"))]
     #[test_case(Rule::IFImplicitArgument, Path::new("IF203.py"))]
-    #[test_case(Rule::IFImplicitFunctionReturn, Path::new("IF101/test.py"))]
-    #[test_case(Rule::IFImplicitArgument, Path::new("IF101/test.py"))]
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("information_flow").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code),
+            &settings::LinterSettings {
+                information_flow: information_flow::settings::Settings {
+                    security_property: information_flow::SecurityProperty::Confidentiality,
+                },
+                target_version: PythonVersion::Py310,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    // Integrity vs. confidentiality vs both
+
+    #[test_case(Rule::IFExplicitVariableAssign)]
+    #[test_case(Rule::IFImplicitVariableAssign)]
+    #[test_case(Rule::IFImplicitFunctionReturn)]
+    #[test_case(Rule::IFImplicitArgument)]
+    fn ci(rule_code: Rule) -> Result<()> {
+        let path = Path::new("information_flow/integrity_vs_confidentiality.py");
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            path,
+            &settings::LinterSettings {
+                information_flow: information_flow::settings::Settings {
+                    security_property: information_flow::SecurityProperty::Both,
+                },
+                target_version: PythonVersion::Py310,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

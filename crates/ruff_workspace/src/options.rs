@@ -21,8 +21,8 @@ use ruff_linter::rules::pylint::settings::ConstantType;
 use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, information_flow, isort,
+    mccabe, pep8_naming, pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, PythonVersion, RequiredVersion, SerializationFormat,
@@ -904,6 +904,10 @@ pub struct LintCommonOptions {
     /// Options for the `pyupgrade` plugin.
     #[option_group]
     pub pyupgrade: Option<PyUpgradeOptions>,
+
+    /// Options for the `information_flow` plugin.
+    #[option_group]
+    pub information_flow: Option<InformationFlowOptions>,
 
     // WARNING: Don't add new options to this type. Add them to `LintOptions` instead.
 
@@ -2955,6 +2959,40 @@ impl PyUpgradeOptions {
     pub fn into_settings(self) -> pyupgrade::settings::Settings {
         pyupgrade::settings::Settings {
             keep_runtime_typing: self.keep_runtime_typing.unwrap_or_default(),
+        }
+    }
+}
+
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct InformationFlowOptions {
+    /// Whether to check for confidentiality, integrity or both for information flow
+    ///
+    /// ```python
+    /// a = 1 # iflabel {alice}
+    /// p = 1 # iflabel {}
+    ///
+    /// a = p # Integrity issue as a is owned by alice while p is public and untrusted
+    /// p = a # Confidentiality issue as p is public while a is owned by alice
+    /// ```
+    #[option(
+        default = r#"confidentiality"#,
+        value_type = r#""confidentiality" | "integrity" | "both""#,
+        example = r#"
+            # Check information flow for confidentiality, integrity or both.
+            security-property = confidentiality
+        "#
+    )]
+    pub security_property: Option<information_flow::settings::SecurityProperty>,
+}
+
+impl InformationFlowOptions {
+    pub fn into_settings(self) -> information_flow::settings::Settings {
+        information_flow::settings::Settings {
+            security_property: self.security_property.unwrap_or_default(),
         }
     }
 }

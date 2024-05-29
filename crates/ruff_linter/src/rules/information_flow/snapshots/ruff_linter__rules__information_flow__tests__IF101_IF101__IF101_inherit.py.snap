@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/information_flow/mod.rs
 ---
-IF101_inherit.py:8:1: IF101 Illegal explicit assignment to more restrictive variable. Target `a` with label `{alice}` is being assigned to `b2` with label `{bob}`
+IF101_inherit.py:8:1: IF101 Invalid confidentiality and integrity explicit flow: The target a@{alice} is in another branch than the value b2@{bob}
    |
  6 | b2 = b + 1 # should have Bob's label
  7 | 
@@ -11,7 +11,7 @@ IF101_inherit.py:8:1: IF101 Illegal explicit assignment to more restrictive vari
 10 | c = a + b # Should have {alice, bob}
    |
 
-IF101_inherit.py:12:1: IF101 Illegal explicit assignment to more restrictive variable. Target `a` with label `{alice}` is being assigned to `c` with label `{alice, bob}`
+IF101_inherit.py:12:1: IF101 Invalid confidentiality explicit flow: a@{alice} < c@{alice, bob}
    |
 10 | c = a + b # Should have {alice, bob}
 11 | 
@@ -20,7 +20,7 @@ IF101_inherit.py:12:1: IF101 Illegal explicit assignment to more restrictive var
 13 | b = c # Fail
    |
 
-IF101_inherit.py:13:1: IF101 Illegal explicit assignment to more restrictive variable. Target `b` with label `{bob}` is being assigned to `c` with label `{alice, bob}`
+IF101_inherit.py:13:1: IF101 Invalid confidentiality explicit flow: b@{bob} < c@{alice, bob}
    |
 12 | a = c # Fail
 13 | b = c # Fail
@@ -29,7 +29,7 @@ IF101_inherit.py:13:1: IF101 Illegal explicit assignment to more restrictive var
 15 | d = [a, b] # Should have {alice, bob}
    |
 
-IF101_inherit.py:18:1: IF101 Illegal explicit assignment to more restrictive variable. Target `a` with label `{alice}` is being assigned to `d` with label `{alice, bob}`
+IF101_inherit.py:18:1: IF101 Invalid confidentiality explicit flow: a@{alice} < d@{alice, bob}
    |
 17 | c = d # Success
 18 | a = d # Fail

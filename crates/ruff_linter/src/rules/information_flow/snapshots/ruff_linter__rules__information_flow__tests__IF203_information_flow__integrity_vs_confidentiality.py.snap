@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+---
+integrity_vs_confidentiality.py:18:10: IF203 Invalid confidentiality implicit argument flow: a@{alice} < alice_bob_var@{alice, bob}
+   |
+16 | bob_var = alice_bob_var # IF101
+17 | 
+18 | alice_fn(alice_bob_var) # IF203: Fail
+   |          ^^^^^^^^^^^^^ IF203
+19 | 
+20 | if bob_var == 42:
+   |
+
+integrity_vs_confidentiality.py:32:8: IF203 Invalid integrity implicit argument flow: b@{bob} > public_var@{}
+   |
+30 | alice_bob_var = bob_var # IF101
+31 | 
+32 | bob_fn(public_var) # IF203: Fail
+   |        ^^^^^^^^^^ IF203
+33 | 
+34 | if bob_var == 42:
+   |

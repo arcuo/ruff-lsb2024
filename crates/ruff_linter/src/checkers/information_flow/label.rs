@@ -92,7 +92,7 @@ impl PartialOrd for Label {
     }
 
     fn lt(&self, other: &Self) -> bool {
-        self != other && other.is_higher_in_lattice_path(self)
+        other.is_higher_in_lattice_path(self)
     }
 
     fn le(&self, other: &Self) -> bool {
@@ -100,7 +100,7 @@ impl PartialOrd for Label {
     }
 
     fn gt(&self, other: &Self) -> bool {
-        self != other && self.is_higher_in_lattice_path(other)
+        self.is_higher_in_lattice_path(other)
     }
 
     fn ge(&self, other: &Self) -> bool {

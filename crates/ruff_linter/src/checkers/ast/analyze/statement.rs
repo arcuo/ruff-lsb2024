@@ -366,7 +366,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         }
         Stmt::Return(_) => {
             if checker.enabled(Rule::IFImplicitFunctionReturn) {
-                information_flow::rules::implicit_function_return(checker, stmt);
+                information_flow::rules::implicit_function_return(
+                    checker,
+                    stmt,
+                    &checker.settings.information_flow.security_property,
+                );
             }
             if checker.enabled(Rule::ReturnOutsideFunction) {
                 pyflakes::rules::return_outside_function(checker, stmt);
@@ -1086,12 +1090,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, value, .. }) => {
             if checker.enabled(Rule::IFExplicitVariableAssign) {
                 information_flow::rules::illegal_assign_target_statement(
-                    checker, &target, &value,
+                    checker,
+                    &target,
+                    &value,
+                    &checker.settings.information_flow.security_property,
                 );
             }
             if checker.enabled(Rule::IFImplicitVariableAssign) {
                 information_flow::rules::implicit_inconfidential_assign_target_statement(
-                    checker, &target,
+                    checker,
+                    &target,
+                    &checker.settings.information_flow.security_property,
                 );
             }
             if checker.enabled(Rule::SelfOrClsAssignment) {
@@ -1458,16 +1467,18 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             },
         ) => {
             if checker.enabled(Rule::IFExplicitVariableAssign) {
-                information_flow::rules::inconfidential_assign_targets_statement(
+                information_flow::rules::check_if_assign_targets_statement(
                     checker,
                     &assign.targets,
                     &assign.value,
+                    &checker.settings.information_flow.security_property,
                 );
             }
             if checker.enabled(Rule::IFImplicitVariableAssign) {
                 information_flow::rules::implicit_inconfidential_assign_targets_statement(
                     checker,
                     &assign.targets,
+                    &checker.settings.information_flow.security_property,
                 );
             }
             if checker.enabled(Rule::IFMustIncludeVariableLabel) {
@@ -1629,12 +1640,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::IFExplicitVariableAssign) {
                     information_flow::rules::illegal_assign_target_statement(
-                        checker, &target, value,
+                        checker,
+                        &target,
+                        value,
+                        &checker.settings.information_flow.security_property,
                     );
                 }
                 if checker.enabled(Rule::IFImplicitVariableAssign) {
                     information_flow::rules::implicit_inconfidential_assign_target_statement(
-                        checker, &target,
+                        checker,
+                        &target,
+                        &checker.settings.information_flow.security_property,
                     );
                 }
                 if checker.enabled(Rule::IFMustIncludeVariableLabel) {
