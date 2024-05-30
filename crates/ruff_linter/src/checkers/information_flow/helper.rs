@@ -210,6 +210,6 @@ pub(crate) fn get_label_for_expression(
         | Expr::StringLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::BytesLiteral(_)
-        | Expr::EllipsisLiteral(_) => None,
+        | Expr::EllipsisLiteral(_) => Some(information_flow.default_label()), // Principle of least privilege TODO: add setting for this?
     }
 }

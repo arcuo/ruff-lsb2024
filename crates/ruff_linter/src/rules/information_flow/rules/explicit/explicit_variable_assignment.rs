@@ -10,6 +10,7 @@ use crate::{
         ast::Checker,
         information_flow::{
             helper::{get_label_for_expression, get_variable_label_by_name},
+            information_flow_state::{get_comment_label, get_comment_text},
             label::Label,
         },
     },
@@ -89,6 +90,15 @@ pub(crate) fn illegal_assign_target_statement(
                 checker.information_flow(),
                 target_name,
             );
+
+            // If there exists a comment label on the target, skip the check
+            if let Some(_) = get_comment_label(
+                target.range(),
+                checker.locator(),
+                checker.indexer().comment_ranges(),
+            ) {
+                return;
+            }
 
             if let Some(value_label) =
                 get_label_for_expression(checker.semantic(), checker.information_flow(), value)

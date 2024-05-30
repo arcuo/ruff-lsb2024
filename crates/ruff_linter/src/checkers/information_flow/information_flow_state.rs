@@ -1,3 +1,5 @@
+use lazy_static::lazy_static;
+use regex::Regex;
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 
@@ -13,12 +15,25 @@ use super::{
     principals::{initiate_principals, Principals},
 };
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+lazy_static! {
+    static ref EXTRACT_PREVIOUS_LINE: Regex = Regex::new(r"^\s*#\s*iflabel.*").unwrap();
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct PC {
     /// The current PC label
     label: Label,
     /// The range of the statement where the PC is set
     range: TextRange,
+}
+
+impl Default for PC {
+    fn default() -> Self {
+        Self {
+            label: Label::new_public(),
+            range: TextRange::default(),
+        }
+    }
 }
 
 /// State of the information flow
@@ -43,6 +58,10 @@ impl InformationFlowState {
             pc: VecDeque::default(),
             function_parameter_map: FxHashMap::default(),
         }
+    }
+
+    pub(crate) fn default_label(&self) -> Label {
+        Label::new(self.principals.to_vec())
     }
 
     /// Return the current level of the information flow state
@@ -101,13 +120,13 @@ impl InformationFlowState {
         &self,
         function_binding_id: BindingId,
         index: usize,
-    ) -> Option<(String, Label)> {
+    ) -> (String, Option<Label>) {
         if let Some(labels) = self.function_parameter_map.get(&function_binding_id) {
             if let Some((name, label)) = labels.iter().nth(index) {
-                return Some((name.clone(), label.clone()));
+                return (name.clone(), Some(label.clone()));
             }
         }
-        None
+        (String::new(), None)
     }
 
     /// Add a information flow label to the binding_id in the variable map
@@ -264,7 +283,7 @@ impl InformationFlowState {
     }
 }
 
-pub(crate) fn read_variable_label_from_source(
+pub(crate) fn get_comment_label(
     range: TextRange,
     locator: &Locator,
     comment_ranges: &CommentRanges,
@@ -284,7 +303,10 @@ fn get_previous_line(locator: &Locator, range: TextRange) -> Option<TextRange> {
     }
 
     let previous_line = locator.line_range(TextSize::from(current_line.start().to_u32() - 1));
-    Some(previous_line)
+    if let Some(_) = EXTRACT_PREVIOUS_LINE.captures(locator.slice(previous_line)) {
+        return Some(previous_line);
+    }
+    None
 }
 
 /// Get the comment text inline or line above

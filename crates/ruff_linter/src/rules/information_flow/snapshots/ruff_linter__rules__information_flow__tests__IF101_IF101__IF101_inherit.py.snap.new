@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 58
+---
+IF101_inherit.py:3:1: IF101 Invalid confidentiality explicit flow: a@{alice} < 1@{alice, bob}
+  |
+1 | # ifprincipals {alice, bob}
+2 | 
+3 | a = 1 # iflabel {alice}
+  | ^ IF101
+4 | b = 2 # iflabel {bob}
+  |
+
+IF101_inherit.py:4:1: IF101 Invalid confidentiality explicit flow: b@{bob} < 2@{alice, bob}
+  |
+3 | a = 1 # iflabel {alice}
+4 | b = 2 # iflabel {bob}
+  | ^ IF101
+5 | 
+6 | b2 = b + 1 # should have Bob's label
+  |
+
+IF101_inherit.py:8:1: IF101 Invalid confidentiality explicit flow: a@{alice} < b2@{bob, alice}
+   |
+ 6 | b2 = b + 1 # should have Bob's label
+ 7 | 
+ 8 | a = b2 # Fail
+   | ^ IF101
+ 9 | 
+10 | c = a + b # Should have {alice, bob}
+   |
+
+IF101_inherit.py:12:1: IF101 Invalid confidentiality explicit flow: a@{alice} < c@{alice, bob}
+   |
+10 | c = a + b # Should have {alice, bob}
+11 | 
+12 | a = c # Fail
+   | ^ IF101
+13 | b = c # Fail
+   |
+
+IF101_inherit.py:13:1: IF101 Invalid confidentiality explicit flow: b@{bob} < c@{alice, bob}
+   |
+12 | a = c # Fail
+13 | b = c # Fail
+   | ^ IF101
+14 | 
+15 | d = [a, b] # Should have {alice, bob}
+   |
+
+IF101_inherit.py:18:1: IF101 Invalid confidentiality explicit flow: a@{alice} < d@{alice, bob}
+   |
+17 | c = d # Success
+18 | a = d # Fail
+   | ^ IF101
+   |

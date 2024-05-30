@@ -49,6 +49,10 @@ impl Principals {
         }
     }
 
+    pub(crate) fn to_vec(&self) -> Vec<String> {
+        self.principals.clone()
+    }
+
     pub(crate) fn new_empty() -> Self {
         Self {
             principals: vec![],

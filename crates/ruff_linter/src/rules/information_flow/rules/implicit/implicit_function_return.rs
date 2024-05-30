@@ -120,8 +120,10 @@ pub(crate) fn implicit_function_return(
 
                 checker.diagnostics.push(Diagnostic::new(
                     IFImplicitFunctionReturn {
-                        defined_return_label: defined_return_label.unwrap_or_default(),
-                        return_label: return_label.unwrap_or_default(),
+                        defined_return_label: defined_return_label
+                            .unwrap_or(checker.information_flow().default_label()),
+                        return_label: return_label
+                            .unwrap_or(checker.information_flow().default_label()),
                         return_expr: checker.locator().slice(value.range()).to_string(),
                         property: shown_property,
                     },

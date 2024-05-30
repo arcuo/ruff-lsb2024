@@ -8,7 +8,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::checkers::{
     ast::Checker,
     information_flow::{
-        information_flow_state::read_variable_label_from_source, label::Label,
+        information_flow_state::get_comment_label, label::Label,
         principals::Principals,
     },
 };
@@ -66,7 +66,7 @@ impl Violation for IFMissingPrincipal {
 
 /// IF002
 pub(crate) fn missing_principal_from_label(checker: &mut Checker, assign_range: TextRange) {
-    let Some((label, comment_range)) = read_variable_label_from_source(
+    let Some((label, comment_range)) = get_comment_label(
         assign_range,
         checker.locator(),
         checker.indexer().comment_ranges(),

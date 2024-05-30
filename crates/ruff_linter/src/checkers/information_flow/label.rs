@@ -15,7 +15,7 @@ lazy_static! {
     static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w]+)\s*:\s*\{(?P<label>[\w\s*,]+)?\}").unwrap();
 }
 
-#[derive(Debug, PartialEq, Clone, Default, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub(crate) struct Label {
     pub(crate) principals: FxHashSet<String>,
 }
@@ -184,7 +184,7 @@ fn test_label_ordering() {
     assert!(!(b <= a));
 }
 
-#[derive(Debug, PartialEq, Clone, Default, Eq)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub(crate) struct FunctionLabel {
     pub(crate) argument_labels: Vec<(String, Label)>,
     pub(crate) return_label: Label,

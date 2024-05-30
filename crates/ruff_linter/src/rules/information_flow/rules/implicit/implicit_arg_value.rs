@@ -75,11 +75,12 @@ pub(crate) fn check_implicit_arg_value(
 ) {
     let (argname, defined_arg_label) = checker
         .information_flow()
-        .get_parameter_label_by_index(function_binding_id, arg_index)
-        .unwrap_or_default();
+        .get_parameter_label_by_index(function_binding_id, arg_index);
 
     let arg_label = get_label_for_expression(checker.semantic(), checker.information_flow(), arg)
-        .unwrap_or_default();
+        .unwrap_or(checker.information_flow().default_label());
+
+    let defined_arg_label = defined_arg_label.unwrap_or(checker.information_flow().default_label());
 
     if arg_label == defined_arg_label {
         return;
@@ -140,7 +141,7 @@ pub(crate) fn check_implicit_keyword_value(
 
     let arg_label =
         get_label_for_expression(checker.semantic(), checker.information_flow(), &kw.value)
-            .unwrap_or_default();
+            .unwrap_or(checker.information_flow().default_label());
 
     if arg_label == defined_arg_label {
         return;
