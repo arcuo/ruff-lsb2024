@@ -81,18 +81,19 @@ pub(crate) fn get_label_for_expression(
 ) -> Option<Label> {
     match expr {
         Expr::Name(name) => get_variable_label_by_name(semantic, information_flow, name), // Get label from variable
-        Expr::Subscript(ExprSubscript { slice, .. }) => {
-            get_label_for_expression(semantic, information_flow, slice)
+        Expr::Subscript(ExprSubscript { slice, value, .. }) => {
+            let value_label = get_label_for_expression(semantic, information_flow, value);
+            let slice_label = get_label_for_expression(semantic, information_flow, slice);
+
+            Some(get_combination_of_labels_from_list_of_labels(vec![
+                value_label,
+                slice_label,
+            ]))
         }
         Expr::UnaryOp(ExprUnaryOp { operand, .. }) => {
             get_label_for_expression(semantic, information_flow, operand)
         }
-        Expr::Named(ExprNamed {
-            target: left,
-            value: right,
-            ..
-        })
-        | Expr::BinOp(ExprBinOp { left, right, .. }) => {
+        Expr::BinOp(ExprBinOp { left, right, .. }) => {
             let left_label = get_label_for_expression(semantic, information_flow, left);
             let right_label = get_label_for_expression(semantic, information_flow, right);
 
@@ -150,7 +151,8 @@ pub(crate) fn get_label_for_expression(
         Expr::Attribute(ExprAttribute { value, .. }) => {
             // Get label from object
             get_label_for_expression(semantic, information_flow, value)
-        } // TODO: For now we only handle the object label. Handle attribute individual attributes expressions (i.e. attributes from classes)
+            // TODO: For now we only handle the object label. Handle attribute individual attributes expressions (i.e. attributes from classes)
+        }
 
         Expr::Compare(ExprCompare {
             left, comparators, ..
@@ -187,6 +189,8 @@ pub(crate) fn get_label_for_expression(
         Expr::SetComp(_) => None,  // TODO: Handle set comprehensions
         Expr::DictComp(_) => None, // TODO: Handle dict comprehensions
         Expr::Generator(_) => None,
+
+        Expr::Named(_) => None, // TODO: Handle named expressions (x := 1)
 
         // Functions
         Expr::Call(ExprCall { func, .. }) => {

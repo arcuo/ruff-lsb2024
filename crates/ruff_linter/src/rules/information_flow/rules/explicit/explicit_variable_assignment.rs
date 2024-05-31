@@ -2,8 +2,9 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
-    ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
+    ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp, Stmt,
 };
+use ruff_text_size::Ranged;
 
 use crate::{
     checkers::{
@@ -136,6 +137,13 @@ pub(crate) fn illegal_assign_target_statement(
                         security_property.clone()
                     };
 
+                    let stmt_range =
+                        if let Stmt::Assign(assign) = checker.semantic().current_statement() {
+                            assign.range()
+                        } else {
+                            target.range()
+                        };
+
                     checker.diagnostics.push(Diagnostic::new(
                         IFExplicitVariableAssign {
                             target: target_name.id.clone(),
@@ -144,7 +152,7 @@ pub(crate) fn illegal_assign_target_statement(
                             value_label,
                             property: shown_property,
                         },
-                        target.range(),
+                        stmt_range,
                     ));
                 }
             }
