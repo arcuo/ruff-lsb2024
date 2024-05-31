@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 58
+---
+IF101_fun.py:33:1: IF101 Invalid confidentiality explicit flow: public@{} < help(alice, public)@{alice}
+   |
+32 | # Checking return
+33 | public = help(alice, public) # Fail
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ IF101
+34 | alice = help(alice, public) # Succeed 
+   |

@@ -31,14 +31,13 @@ else: # Still in the same block i.e. the initial test sets the pc {secret}
 
 # PC should be reset after block
 
-# TODO: Q - Does these statements below affect the information flow above?
 public_var = 0 # Success
 public_var: int = 2 # Success
 
 # TODO: Q - This one definitely does not.
 public_var += 1 # Success 
 
-if public_var == 0:
+if public_var:
     secret_var = 0 # Success
     secret_var += 1 # Success
     secret_var: int = 2 # Success

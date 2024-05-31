@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 81
+---
+integrity_vs_confidentiality.py:15:1: IF101 Invalid confidentiality explicit flow: alice_var@{alice} < alice_bob_var@{alice, bob}
+   |
+13 |     return alice_var # IF202
+14 | 
+15 | alice_var = alice_bob_var # IF101
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ IF101
+16 | bob_var = alice_bob_var # IF101
+   |
+
+integrity_vs_confidentiality.py:16:1: IF101 Invalid confidentiality explicit flow: bob_var@{bob} < alice_bob_var@{alice, bob}
+   |
+15 | alice_var = alice_bob_var # IF101
+16 | bob_var = alice_bob_var # IF101
+   | ^^^^^^^^^^^^^^^^^^^^^^^ IF101
+17 | 
+18 | alice_fn(alice_bob_var) # IF203: Fail
+   |
+
+integrity_vs_confidentiality.py:29:1: IF101 Invalid integrity explicit flow: alice_bob_var@{alice, bob} > alice_var@{alice}
+   |
+27 |     return bob_var # IF202
+28 | 
+29 | alice_bob_var = alice_var # IF101
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ IF101
+30 | alice_bob_var = bob_var # IF101
+   |
+
+integrity_vs_confidentiality.py:30:1: IF101 Invalid integrity explicit flow: alice_bob_var@{alice, bob} > bob_var@{bob}
+   |
+29 | alice_bob_var = alice_var # IF101
+30 | alice_bob_var = bob_var # IF101
+   | ^^^^^^^^^^^^^^^^^^^^^^^ IF101
+31 | 
+32 | bob_fn(public_var) # IF203: Fail
+   |
+
+integrity_vs_confidentiality.py:35:5: IF101 Invalid integrity explicit flow: alice_bob_var@{alice, bob} > 69@{}
+   |
+34 | if bob_var == 42:
+35 |     alice_bob_var = 69 # IF201
+   |     ^^^^^^^^^^^^^^^^^^ IF101
+   |
+
+integrity_vs_confidentiality.py:40:1: IF101 Invalid confidentiality and integrity explicit flow: The target alice_var@{alice} is in another branch than the value bob_var@{bob}
+   |
+38 | ## Both
+39 | 
+40 | alice_var = bob_var # IF101
+   | ^^^^^^^^^^^^^^^^^^^ IF101
+41 | public_fn(bob_var) # IF203
+   |

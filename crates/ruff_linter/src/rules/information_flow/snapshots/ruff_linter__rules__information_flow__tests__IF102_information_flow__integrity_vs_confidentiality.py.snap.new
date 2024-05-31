@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 81
+---
+integrity_vs_confidentiality.py:13:5: IF102 Invalid confidentiality explicit function return flow: alice_var@{alice} > {}
+   |
+11 | # iflabel fn (a: {alice}) {}
+12 | def alice_fn(a):
+13 |     return alice_var # IF202
+   |     ^^^^^^^^^^^^^^^^ IF102
+14 | 
+15 | alice_var = alice_bob_var # IF101
+   |
+
+integrity_vs_confidentiality.py:27:5: IF102 Invalid integrity explicit function return flow: bob_var@{bob} < {alice, bob}
+   |
+25 | # iflabel fn (b: {bob}) {alice, bob}
+26 | def bob_fn(b):
+27 |     return bob_var # IF202
+   |     ^^^^^^^^^^^^^^ IF102
+28 | 
+29 | alice_bob_var = alice_var # IF101
+   |

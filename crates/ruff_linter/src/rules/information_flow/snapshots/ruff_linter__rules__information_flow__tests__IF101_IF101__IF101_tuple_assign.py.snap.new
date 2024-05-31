@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 58
+---
+IF101_tuple_assign.py:16:1: IF101 Invalid confidentiality explicit flow: bob_var@{bob} < 1, alice_bob_var@{alice, bob}
+   |
+15 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+16 | alice_bob_var, bob_var = 1, alice_bob_var
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ IF101
+17 | alice_bob_var, bob_var = alice_bob_var
+   |
+
+IF101_tuple_assign.py:17:1: IF101 Invalid confidentiality explicit flow: bob_var@{bob} < alice_bob_var@{alice, bob}
+   |
+15 | # IF101: Fail - Information flow from {alice,bob} to {bob}
+16 | alice_bob_var, bob_var = 1, alice_bob_var
+17 | alice_bob_var, bob_var = alice_bob_var
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ IF101
+   |
