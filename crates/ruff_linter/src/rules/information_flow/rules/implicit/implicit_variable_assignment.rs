@@ -2,10 +2,10 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCompare, ExprDict, ExprIf, ExprList,
-    ExprName, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
+    ExprName, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp, Stmt,
 };
 use ruff_source_file::OneIndexed;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
     checkers::{
@@ -132,6 +132,13 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
                     security_property.clone()
                 };
 
+                let stmt_range =
+                    if let Stmt::Assign(assign) = checker.semantic().current_statement() {
+                        assign.range()
+                    } else {
+                        target.range()
+                    };
+
                 let pc_expr_range = checker.information_flow().get_pc_expr_range();
                 #[allow(deprecated)]
                 checker.diagnostics.push(Diagnostic::new(
@@ -144,7 +151,7 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
                         pc,
                         property: shown_property,
                     },
-                    target.range(),
+                    stmt_range,
                 ));
             }
         }
