@@ -104,10 +104,6 @@ pub(crate) fn illegal_assign_target_statement(
             if let Some(value_label) =
                 get_label_for_expression(checker.semantic(), checker.information_flow(), value)
             {
-                if value_label.is_public() {
-                    return;
-                }
-
                 // Value is not public, check if label(target) >= label(value)
                 if let Some(target_label) = target_label {
                     if value_label == target_label {
