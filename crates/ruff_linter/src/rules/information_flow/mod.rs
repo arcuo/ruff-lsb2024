@@ -40,8 +40,8 @@ mod tests {
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201/IF201_for.py"))]
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201/IF201_nested.py"))]
     #[test_case(Rule::IFImplicitVariableAssign, Path::new("IF201/IF201_assert.py"))]
-    #[test_case(Rule::IFImplicitFunctionReturn, Path::new("IF202.py"))]
-    #[test_case(Rule::IFImplicitArgument, Path::new("IF203.py"))]
+    #[test_case(Rule::IFExplicitFunctionReturn, Path::new("IF202.py"))]
+    #[test_case(Rule::IFExplicitArgument, Path::new("IF203.py"))]
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -63,8 +63,8 @@ mod tests {
 
     #[test_case(Rule::IFExplicitVariableAssign)]
     #[test_case(Rule::IFImplicitVariableAssign)]
-    #[test_case(Rule::IFImplicitFunctionReturn)]
-    #[test_case(Rule::IFImplicitArgument)]
+    #[test_case(Rule::IFExplicitFunctionReturn)]
+    #[test_case(Rule::IFExplicitArgument)]
     fn ci(rule_code: Rule) -> Result<()> {
         let path = Path::new("information_flow/integrity_vs_confidentiality.py");
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

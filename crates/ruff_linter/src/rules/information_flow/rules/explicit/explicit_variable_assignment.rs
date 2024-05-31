@@ -72,7 +72,7 @@ pub(crate) fn check_if_assign_targets_statement(
 }
 
 /// IF101
-/// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking implicit flow)
+/// T_ASSIGN_EXPLICIT: label(value) <= label(target) (not checking explicit flow)
 pub(crate) fn illegal_assign_target_statement(
     checker: &mut Checker,
     target: &Expr,

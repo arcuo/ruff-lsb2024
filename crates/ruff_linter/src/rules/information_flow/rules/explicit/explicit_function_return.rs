@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// ## What it does
-/// Check confidentiality of information flow in variables returned by functions for implicit flows.
+/// Check confidentiality of information flow in variables returned by functions for explicit flows.
 ///
 /// ## Why is this bad?
 /// You do not want a function to return a variable with a higher label than the defined return label. Otherwise, it could lead to information leakage.
@@ -43,18 +43,18 @@ use crate::{
 ///   return alice_bob_return # Fail
 ///```
 #[violation]
-pub struct IFImplicitFunctionReturn {
+pub struct IFExplicitFunctionReturn {
     defined_return_label: Label,
     return_expr: String,
     return_label: Label,
     property: SecurityProperty,
 }
 
-impl Violation for IFImplicitFunctionReturn {
+impl Violation for IFExplicitFunctionReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Invalid {} implicit argument flow: {}",
+            "Invalid {} explicit function return flow: {}",
             self.property.to_string(),
             self.property.get_description_return(
                 &self.return_expr,
@@ -66,7 +66,7 @@ impl Violation for IFImplicitFunctionReturn {
 }
 
 /// IF202
-pub(crate) fn implicit_function_return(
+pub(crate) fn explicit_function_return(
     checker: &mut Checker,
     stmt: &Stmt,
     security_property: &SecurityProperty,
@@ -119,7 +119,7 @@ pub(crate) fn implicit_function_return(
                 };
 
                 checker.diagnostics.push(Diagnostic::new(
-                    IFImplicitFunctionReturn {
+                    IFExplicitFunctionReturn {
                         defined_return_label: defined_return_label
                             .unwrap_or(checker.information_flow().default_label()),
                         return_label: return_label

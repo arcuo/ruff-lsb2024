@@ -365,8 +365,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Return(_) => {
-            if checker.enabled(Rule::IFImplicitFunctionReturn) {
-                information_flow::rules::implicit_function_return(
+            if checker.enabled(Rule::IFExplicitFunctionReturn) {
+                information_flow::rules::explicit_function_return(
                     checker,
                     stmt,
                     &checker.settings.information_flow.security_property,

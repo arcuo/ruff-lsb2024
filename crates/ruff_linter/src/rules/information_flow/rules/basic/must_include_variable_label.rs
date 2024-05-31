@@ -36,7 +36,7 @@ impl Violation for IFMustIncludeVariableLabel {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-      "Missing variable label for `{}` Variables are by default public. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel {{ ... }}` or `iflabel {{}}` for public.",
+      "Missing variable label for `{}`. This can introduce unintended information leakage. Please add an explicit label to the variable `iflabel {{ ... }}` or `iflabel {{}}` for public.",
       self.var
     )
     }

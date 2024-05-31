@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// ## What it does
-/// Check confidentiality of information flow in values set to function arguments for implicit flows.
+/// Check confidentiality of information flow in values set to function arguments for explicit flows.
 ///
 /// ## Why is this bad?
 /// You do not want a function to receive a variable with a higher label than the defined argument label. Otherwise, it could lead to information leakage.
@@ -41,7 +41,7 @@ use crate::{
 ///
 ///```
 #[violation]
-pub struct IFImplicitArgument {
+pub struct IFExplicitArgument {
     expr_string: String,
     arg_label: Label,
     argname: String,
@@ -49,11 +49,11 @@ pub struct IFImplicitArgument {
     property: SecurityProperty,
 }
 
-impl Violation for IFImplicitArgument {
+impl Violation for IFExplicitArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Invalid {} implicit argument flow: {}",
+            "Invalid {} explicit argument flow: {}",
             self.property.to_string(),
             self.property.get_description(
                 &self.argname,
@@ -66,7 +66,7 @@ impl Violation for IFImplicitArgument {
 }
 
 /// IF202
-pub(crate) fn check_implicit_arg_value(
+pub(crate) fn check_explicit_arg_value(
     checker: &mut Checker,
     function_binding_id: BindingId,
     arg: &Expr,
@@ -110,7 +110,7 @@ pub(crate) fn check_implicit_arg_value(
     let expr_string = checker.locator().slice(arg.range()).to_string();
 
     let diagnostic = Diagnostic::new(
-        IFImplicitArgument {
+        IFExplicitArgument {
             expr_string,
             arg_label,
             argname: argname.to_string(),
@@ -122,7 +122,7 @@ pub(crate) fn check_implicit_arg_value(
     checker.diagnostics.push(diagnostic);
 }
 
-pub(crate) fn check_implicit_keyword_value(
+pub(crate) fn check_explicit_keyword_value(
     checker: &mut Checker,
     function_binding_id: BindingId,
     kw: &Keyword,
@@ -171,7 +171,7 @@ pub(crate) fn check_implicit_keyword_value(
     };
 
     let diagnostic = Diagnostic::new(
-        IFImplicitArgument {
+        IFExplicitArgument {
             expr_string,
             argname: arg.as_str().to_string(),
             arg_label,
