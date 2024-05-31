@@ -3,7 +3,7 @@ use super::label::Label;
 use itertools::Itertools;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
-    ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
+    ExprList, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
 use ruff_python_ast::{ExprName, Stmt};
 use ruff_python_semantic::SemanticModel;
