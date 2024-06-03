@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use regex::Regex;
+use ruff_python_ast::Stmt;
 use rustc_hash::FxHashMap;
 use std::collections::VecDeque;
 
@@ -36,27 +37,80 @@ impl Default for PC {
     }
 }
 
+#[derive(Clone, Debug)]
+struct FunctionDefinition<'a> {
+    /// The return label of the function
+    return_label: Option<Label>,
+    /// The parameter labels of the function
+    parameter_labels: &'a FxHashMap<String, Label>,
+    /// Function body for label inference
+    body: Vec<Stmt>,
+}
+
+impl<'a> FunctionDefinition<'a> {
+    fn new(parameter_labels: &'a FxHashMap<String, Label>) -> Self {
+        Self {
+            return_label: None,
+            parameter_labels,
+            body: Vec::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct VariableMap {
+    variable_map: FxHashMap<BindingId, Label>,
+    pub(crate) return_label: Option<Label>,
+}
+
+impl VariableMap {
+    fn get(&self, binding_id: &BindingId) -> Option<&Label> {
+        return self.variable_map.get(binding_id);
+    }
+
+    fn insert(&mut self, binding_id: BindingId, label: Label) {
+        self.variable_map.insert(binding_id, label);
+    }
+
+    pub(crate) fn update_return_label(&mut self, label: Label) {
+        if let Some(return_label) = self.return_label.clone() {
+            self.return_label = Some(return_label + label);
+        } else {
+            self.return_label = Some(label);
+        }
+    }
+}
+
 /// State of the information flow
 #[derive()]
-pub(crate) struct InformationFlowState {
+pub(crate) struct InformationFlowState<'a> {
     /// The current principles of the program, e.g. ['alice', 'bob']
     #[allow(dead_code)]
     principals: Principals,
     /// The current scope level queue. The level is updated according to the scope by popping and
     pc: VecDeque<PC>,
     /// Map from variable name to
-    variable_map: FxHashMap<BindingId, Label>,
+    variable_map_scopes: VecDeque<VariableMap>,
     /// Map from function name to parameter label
-    function_parameter_map: FxHashMap<BindingId, FxHashMap<String, Label>>,
+    function_map: FxHashMap<BindingId, FunctionDefinition<'a>>,
 }
 
-impl InformationFlowState {
+impl<'a> InformationFlowState<'a> {
+    pub(crate) fn push_variable_scope(&mut self) {
+        self.variable_map_scopes.push_front(VariableMap::default());
+    }
+
+    pub(crate) fn pop_variable_scope(&mut self) {
+        self.variable_map_scopes.pop_front();
+    }
+
     pub(crate) fn new(indexer: &Indexer, locator: &Locator) -> Self {
+        let vm = VariableMap::default();
         Self {
             principals: initiate_principals(indexer, locator),
-            variable_map: FxHashMap::default(),
+            variable_map_scopes: VecDeque::from([vm]),
             pc: VecDeque::default(),
-            function_parameter_map: FxHashMap::default(),
+            function_map: FxHashMap::default(),
         }
     }
 
@@ -99,7 +153,19 @@ impl InformationFlowState {
     }
 
     pub(crate) fn get_label(&self, binding_id: BindingId) -> Option<Label> {
-        return self.variable_map.get(&binding_id).cloned();
+        for scope in self.variable_map_scopes.iter() {
+            if let Some(label) = scope.get(&binding_id) {
+                return Some(label.clone());
+            }
+        }
+        None
+    }
+
+    pub(crate) fn get_return_label(&self, binding_id: BindingId) -> Option<Label> {
+        if let Some(FunctionDefinition { return_label, .. }) = self.function_map.get(&binding_id) {
+            return return_label.clone();
+        }
+        None
     }
 
     pub(crate) fn get_parameter_label_by_name(
@@ -107,12 +173,36 @@ impl InformationFlowState {
         function_binding_id: BindingId,
         parameter_name: &str,
     ) -> Option<Label> {
-        if let Some(labels) = self.function_parameter_map.get(&function_binding_id) {
-            if let Some(label) = labels.get(parameter_name) {
+        if let Some(FunctionDefinition {
+            parameter_labels, ..
+        }) = self.function_map.get(&function_binding_id)
+        {
+            if let Some(label) = parameter_labels.get(parameter_name) {
                 return Some(label.clone());
             }
         }
         None
+    }
+
+    pub(crate) fn get_fn_parameter_name(
+        &'a self,
+        fn_binding_id: BindingId,
+        index: usize,
+    ) -> Option<&'a String> {
+        if let Some(FunctionDefinition {
+            parameter_labels, ..
+        }) = self.function_map.get(&fn_binding_id)
+        {
+            if let Some(name) = parameter_labels.keys().nth(index) {
+                return Some(name);
+            }
+        }
+
+        None
+    }
+
+    pub(crate) fn variable_map(&mut self) -> &mut VariableMap {
+        self.variable_map_scopes.front_mut().unwrap()
     }
 
     /// Get the name and label of the parameter by index
@@ -121,8 +211,11 @@ impl InformationFlowState {
         function_binding_id: BindingId,
         index: usize,
     ) -> (String, Option<Label>) {
-        if let Some(labels) = self.function_parameter_map.get(&function_binding_id) {
-            if let Some((name, label)) = labels.iter().nth(index) {
+        if let Some(FunctionDefinition {
+            parameter_labels, ..
+        }) = self.function_map.get(&function_binding_id)
+        {
+            if let Some((name, label)) = parameter_labels.iter().nth(index) {
                 return (name.clone(), Some(label.clone()));
             }
         }
@@ -168,15 +261,8 @@ impl InformationFlowState {
                 );
             }
 
-            // Function bindings
-            BindingKind::FunctionDefinition(_) => {
-                self.add_function_variable_label_binding(
-                    binding_id,
-                    range,
-                    locator,
-                    comment_ranges,
-                );
-            }
+            // Function bindings, do nothing, as this is handled manually in function definitions
+            BindingKind::FunctionDefinition(_) => {},
 
             // todos
             BindingKind::FromImport(_)
@@ -202,12 +288,11 @@ impl InformationFlowState {
         semantic: &SemanticModel,
     ) {
         // Check for label from shadowed bindings
-        // TODO: Declassification (invalid declassification check?)
 
         // Read from comment
         if let Some((label, _)) = get_comment_text(range, locator, comment_ranges) {
             if let Ok(label) = label.as_str().parse::<Label>() {
-                self.variable_map.insert(binding_id, label);
+                self.variable_map().insert(binding_id, label);
                 return;
             }
         }
@@ -222,7 +307,7 @@ impl InformationFlowState {
 
         if let Some(label) = get_label_from_statement(semantic, self, semantic.current_statement())
         {
-            self.variable_map.insert(binding_id, label);
+            self.variable_map().insert(binding_id, label);
             return;
         }
     }
@@ -231,27 +316,42 @@ impl InformationFlowState {
     /// Use [`InformationFlowState::add_binding_label`] instead
     pub(crate) fn add_function_variable_label_binding(
         &mut self,
-        binding_id: BindingId,
+        function_binding_id: BindingId,
+        body: Vec<Stmt>,
         range: TextRange,
         locator: &Locator,
         comment_ranges: &CommentRanges,
     ) {
         // Check for label from shadowed bindings
         // TODO: Implement inheritance from shadowed bindings
-        // TODO: Declassification (invalid declassification check?)
 
-        // Read from comment
+        // Instantiate function map
+        let function_map = self
+            .function_map
+            .entry(function_binding_id)
+            .or_insert_with(FunctionDefinition::new(&FxHashMap::default()));
+
+        function_map.body = body;
+
+        // Read labels from comment
         if let Some((label, _)) = get_comment_text(range, locator, comment_ranges) {
             if let Ok(fn_label) = label.as_str().parse::<FunctionLabel>() {
-                self.variable_map.insert(binding_id, fn_label.return_label);
+                // Insert return label into variable map based on binding_id
+                self.variable_map_scopes
+                    .front_mut()
+                    .unwrap()
+                    .insert(function_binding_id, fn_label.return_label.clone());
+
+                function_map.return_label = Some(fn_label.return_label);
+
                 for (name, label) in fn_label.argument_labels.iter() {
-                    self.function_parameter_map
-                        .entry(binding_id)
-                        .or_insert_with(FxHashMap::default)
+                    function_map
+                        .parameter_labels
                         .insert(name.clone(), label.clone());
                 }
                 return;
             }
+        } else {
         }
     }
 
@@ -269,11 +369,11 @@ impl InformationFlowState {
         if let Some(function_label) =
             self.get_parameter_label_by_name(function_binding_id, &parameter_name)
         {
-            self.variable_map
+            self.variable_map()
                 .insert(parameter_binding_id, function_label);
         } else {
             // No label comment, add public label
-            self.variable_map
+            self.variable_map()
                 .insert(parameter_binding_id, Label::new_public());
         }
     }

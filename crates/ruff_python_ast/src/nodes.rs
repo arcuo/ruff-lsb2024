@@ -661,6 +661,14 @@ impl Expr {
         }
     }
 
+    pub fn as_name(&self) -> Option<&String> {
+        match self {
+            Expr::Name(ExprName { id, .. }) => Some(id),
+            Expr::If(_) => None, // TODO: You could essentially have an ifelse expression which could return two different variables. Implement this.
+            _ => None,
+        }
+    }
+
     /// Returns the [`TextRange`] of the expression.
     pub fn range(&self) -> TextRange {
         match self {

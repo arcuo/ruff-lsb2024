@@ -3,6 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCompare, ExprDict, ExprIf, ExprList,
     ExprName, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp, Stmt,
+    StmtAnnAssign, StmtAssign, StmtAugAssign,
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
@@ -126,18 +127,12 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
                     return;
                 }
 
-                let shown_property = if security_property.is_both() {
-                    property
-                } else {
-                    security_property.clone()
+                let stmt_range = match checker.semantic().current_statement() {
+                    Stmt::Assign(StmtAssign { range, .. })
+                    | Stmt::AnnAssign(StmtAnnAssign { range, .. })
+                    | Stmt::AugAssign(StmtAugAssign { range, .. }) => range.clone(),
+                    _ => target.range(),
                 };
-
-                let stmt_range =
-                    if let Stmt::Assign(assign) = checker.semantic().current_statement() {
-                        assign.range()
-                    } else {
-                        target.range()
-                    };
 
                 let pc_expr_range = checker.information_flow().get_pc_expr_range();
                 #[allow(deprecated)]
@@ -149,7 +144,7 @@ pub(crate) fn implicit_inconfidential_assign_target_statement(
                             .locator()
                             .compute_line_index(pc_expr_range.start()),
                         pc,
-                        property: shown_property,
+                        property,
                     },
                     stmt_range,
                 ));

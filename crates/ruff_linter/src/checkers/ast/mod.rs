@@ -26,13 +26,15 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
+use std::borrow::Borrow;
 use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
-    FStringElement, Keyword, MatchCase, Parameter, Parameters, Pattern, Stmt, Suite, UnaryOp,
+    self as ast, AnyParameterRef, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprCall,
+    ExprContext, FStringElement, Keyword, MatchCase, Parameter, Parameters, Pattern, Stmt, StmtIf,
+    StmtReturn, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -68,8 +70,13 @@ use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
-use super::information_flow::helper::get_label_for_expression;
+use super::information_flow;
+use super::information_flow::helper::{
+    get_combination_of_labels_from_list_of_labels,
+    get_combination_of_labels_from_list_of_option_labels, get_label_for_expression,
+};
 use super::information_flow::information_flow_state::InformationFlowState;
+use super::information_flow::label::Label;
 
 mod analyze;
 mod annotation;
@@ -352,7 +359,7 @@ impl<'a> Checker<'a> {
     }
 
     /// The [`InformationFlowState`], built up over the course of the AST traversal
-    pub(crate) const fn information_flow(&self) -> &InformationFlowState {
+    pub(crate) const fn information_flow(&self) -> &InformationFlowState<'a> {
         &self.information_flow
     }
 
@@ -740,11 +747,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope(); // Function scope
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
-                self.add_binding(
+                let function_binding_id = self.add_binding(
                     name,
                     stmt.identifier(),
                     BindingKind::FunctionDefinition(scope_id),
                     BindingFlags::empty(),
+                );
+
+                self.information_flow.add_function_variable_label_binding(
+                    function_binding_id,
+                    body.clone(),
+                    stmt.range(),
+                    self.locator(),
+                    self.indexer.comment_ranges(),
                 );
             }
             Stmt::ClassDef(
@@ -966,6 +981,19 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 self.information_flow.pop_pc();
+            }
+            Stmt::Return(ast::StmtReturn { value, range: _ }) => {
+                visitor::walk_stmt(self, stmt);
+
+                if let Some(expr) = value {
+                    if let Some(label) =
+                        get_label_for_expression(self.semantic(), self.information_flow(), expr)
+                    {
+                        self.information_flow
+                            .variable_map()
+                            .update_return_label(label)
+                    }
+                }
             }
             _ => visitor::walk_stmt(self, stmt),
         };
@@ -2391,6 +2419,61 @@ impl<'a> Checker<'a> {
         }
 
         self.semantic.restore(snapshot);
+    }
+
+    /// Traverse the body of a function and get return label inferred from arguments added to the body.
+    fn get_call_expr_inferred_label(
+        &mut self,
+        call_expr: ExprCall,
+        body: &'a Vec<Stmt>,
+    ) -> Option<Label> {
+        // Get function name
+        let Some(fn_name) = call_expr.func.as_name() else {
+            return None;
+        };
+
+        // Check if there exists a defined return label
+        let Some(fn_binding_id) = self.semantic.current_scope().get(fn_name) else {
+            return None;
+        };
+
+        if let Some(return_label) = self.information_flow.get_label(fn_binding_id) {
+            return Some(return_label);
+        }
+
+        // Add function scopes so we can pop out variables later.
+        self.information_flow.push_variable_scope();
+        let snapshot = self.semantic.snapshot();
+
+        // Add argument labels to the scope.
+        for (i, arg) in call_expr.arguments.args.into_iter().enumerate() {
+            let Some(argname) = self
+                .information_flow()
+                .get_fn_parameter_name(fn_binding_id, i)
+            else {
+                continue;
+            };
+
+            self.add_binding(
+                argname,
+                arg.range(),
+                BindingKind::Argument,
+                BindingFlags::empty(),
+            );
+        }
+
+        // Traverse body
+        for stmt in body {
+            self.visit_stmt(stmt);
+        }
+
+        let inferred_return_label = self.information_flow.variable_map().return_label.clone();
+
+        // Restore state after function call
+        self.information_flow.pop_variable_scope();
+        self.semantic.restore(snapshot);
+
+        return inferred_return_label;
     }
 }
 

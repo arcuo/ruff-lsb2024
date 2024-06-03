@@ -1,8 +1,8 @@
+use libcst_native::AnnAssign;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
-    ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp, Stmt,
+    Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf, ExprList, ExprNamed, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp, Stmt, StmtAnnAssign, StmtAssign, StmtAugAssign
 };
 use ruff_text_size::Ranged;
 
@@ -127,18 +127,12 @@ pub(crate) fn illegal_assign_target_statement(
                         return;
                     }
 
-                    let shown_property = if security_property.is_both() {
-                        property
-                    } else {
-                        security_property.clone()
+                    let stmt_range = match checker.semantic().current_statement() {
+                        Stmt::Assign(StmtAssign { range, .. })
+                        | Stmt::AnnAssign(StmtAnnAssign { range, .. })
+                        | Stmt::AugAssign(StmtAugAssign { range, .. }) => range.clone(),
+                        _ => target.range(),
                     };
-
-                    let stmt_range =
-                        if let Stmt::Assign(assign) = checker.semantic().current_statement() {
-                            assign.range()
-                        } else {
-                            target.range()
-                        };
 
                     checker.diagnostics.push(Diagnostic::new(
                         IFExplicitVariableAssign {
@@ -146,7 +140,7 @@ pub(crate) fn illegal_assign_target_statement(
                             target_label,
                             value: checker.locator().slice(value.range()).to_string(),
                             value_label,
-                            property: shown_property,
+                            property,
                         },
                         stmt_range,
                     ));

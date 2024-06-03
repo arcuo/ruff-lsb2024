@@ -164,19 +164,13 @@ pub(crate) fn check_explicit_keyword_value(
 
     let expr_string = checker.locator().slice(kw.value.range()).to_string();
 
-    let shown_property = if security_property.is_both() {
-        property
-    } else {
-        security_property.clone()
-    };
-
     let diagnostic = Diagnostic::new(
         IFExplicitArgument {
             expr_string,
             argname: arg.as_str().to_string(),
             arg_label,
             defined_arg_label,
-            property: shown_property,
+            property,
         },
         kw.value.range(),
     );

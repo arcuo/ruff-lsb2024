@@ -3,7 +3,7 @@ use super::label::Label;
 use itertools::Itertools;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
-    ExprList, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
+    ExprList, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp, StmtReturn,
 };
 use ruff_python_ast::{ExprName, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -34,13 +34,25 @@ pub(crate) fn get_variable_label_by_name(
     }
 }
 
-pub(crate) fn get_combination_of_labels_from_list_of_labels(labels: Vec<Option<Label>>) -> Label {
+pub(crate) fn get_combination_of_labels_from_list_of_option_labels(labels: Vec<Option<Label>>) -> Label {
     let mut curr_label: Label = Label::new_public();
     for label in labels.into_iter().flatten() {
         curr_label += label;
     }
 
     curr_label
+}
+
+pub(crate) fn get_combination_of_labels_from_list_of_labels(labels: Vec<Label>) -> Option<Label> {
+    if labels.is_empty() {
+        return None;
+    }
+    let mut curr_label: Label = Label::new_public();
+    for label in labels.into_iter() {
+        curr_label += label;
+    }
+
+    Some(curr_label)
 }
 
 pub(crate) fn get_list_of_labels_labels(
@@ -85,7 +97,7 @@ pub(crate) fn get_label_for_expression(
             let value_label = get_label_for_expression(semantic, information_flow, value);
             let slice_label = get_label_for_expression(semantic, information_flow, slice);
 
-            Some(get_combination_of_labels_from_list_of_labels(vec![
+            Some(get_combination_of_labels_from_list_of_option_labels(vec![
                 value_label,
                 slice_label,
             ]))
@@ -97,7 +109,7 @@ pub(crate) fn get_label_for_expression(
             let left_label = get_label_for_expression(semantic, information_flow, left);
             let right_label = get_label_for_expression(semantic, information_flow, right);
 
-            Some(get_combination_of_labels_from_list_of_labels(vec![
+            Some(get_combination_of_labels_from_list_of_option_labels(vec![
                 left_label,
                 right_label,
             ]))
@@ -122,7 +134,7 @@ pub(crate) fn get_label_for_expression(
                 get_label_for_expression(semantic, information_flow, step.as_ref().unwrap())
             };
 
-            Some(get_combination_of_labels_from_list_of_labels(vec![
+            Some(get_combination_of_labels_from_list_of_option_labels(vec![
                 lower_label,
                 upper_label,
                 step_label,
@@ -134,7 +146,7 @@ pub(crate) fn get_label_for_expression(
         | Expr::Tuple(ExprTuple { elts: values, .. })
         | Expr::List(ExprList { elts: values, .. })
         | Expr::Set(ExprSet { elts: values, .. }) => {
-            Some(get_combination_of_labels_from_list_of_labels(
+            Some(get_combination_of_labels_from_list_of_option_labels(
                 get_list_of_labels_labels(semantic, information_flow, values),
             ))
         }
@@ -145,7 +157,7 @@ pub(crate) fn get_label_for_expression(
                 .map(|item| item.value.clone())
                 .map(|value| get_label_for_expression(semantic, information_flow, &value))
                 .collect_vec();
-            Some(get_combination_of_labels_from_list_of_labels(value_labels))
+            Some(get_combination_of_labels_from_list_of_option_labels(value_labels))
         }
 
         Expr::Attribute(ExprAttribute { value, .. }) => {
@@ -158,14 +170,14 @@ pub(crate) fn get_label_for_expression(
             left, comparators, ..
         }) => {
             let left_label = get_label_for_expression(semantic, information_flow, left);
-            let right_label = get_combination_of_labels_from_list_of_labels(
+            let right_label = get_combination_of_labels_from_list_of_option_labels(
                 comparators
                     .into_iter()
                     .map(|e| get_label_for_expression(semantic, information_flow, e))
                     .collect_vec(),
             );
 
-            Some(get_combination_of_labels_from_list_of_labels(vec![
+            Some(get_combination_of_labels_from_list_of_option_labels(vec![
                 left_label,
                 Some(right_label),
             ]))
@@ -177,7 +189,7 @@ pub(crate) fn get_label_for_expression(
             let body_label = get_label_for_expression(semantic, information_flow, body);
             let orelse_label = get_label_for_expression(semantic, information_flow, orelse);
 
-            Some(get_combination_of_labels_from_list_of_labels(vec![
+            Some(get_combination_of_labels_from_list_of_option_labels(vec![
                 test_label,
                 body_label,
                 orelse_label,
@@ -193,12 +205,18 @@ pub(crate) fn get_label_for_expression(
         Expr::Named(_) => None, // TODO: Handle named expressions (x := 1)
 
         // Functions
-        Expr::Call(ExprCall { func, .. }) => {
-            get_label_for_expression(semantic, information_flow, func)
-        }
+        Expr::Call(ExprCall {
+            func, arguments, ..
+        }) => get_label_for_expression(semantic, information_flow, func),
         Expr::Lambda(_) => None, // TODO: Handle lambda expressions
         Expr::Await(ExprAwait { value, .. }) => {
-            get_label_for_expression(semantic, information_flow, value)
+            if let Some(return_label) = get_label_for_expression(semantic, information_flow, value)
+            {
+                Some(return_label)
+            } else {
+                // Infer the label from the function
+                None
+            }
         } // Will go to the function expressions
 
         Expr::YieldFrom(_) | Expr::Yield(_) => None, // TODO: Handle yield expressions if needed

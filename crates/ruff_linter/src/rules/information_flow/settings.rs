@@ -65,7 +65,7 @@ impl SecurityProperty {
             }
             SecurityProperty::Both => {
                 format!(
-                    "The target {}@{} is in another branch than the value {}@{}",
+                    "{}@{} != {}@{}",
                     target, target_label, value, value_label
                 )
             }
@@ -87,7 +87,7 @@ impl SecurityProperty {
             }
             SecurityProperty::Both => {
                 format!(
-                    "The target {}@{} is in another branch than the value pc@{}",
+                    "{}@{} != pc@{}",
                     target, target_label, pc_label
                 )
             }
@@ -109,7 +109,7 @@ impl SecurityProperty {
             }
             SecurityProperty::Both => {
                 format!(
-                    "The argument {}@{} is in another branch than the used value label {}",
+                    "{}@{} != {}",
                     argname, defined_arg_label, arg_label
                 )
             }
@@ -137,7 +137,7 @@ impl SecurityProperty {
             }
             SecurityProperty::Both => {
                 format!(
-                    "The returned value {}@{} is in another branch than the defined return label {}",
+                    "{}@{} != {}",
                     return_expr, return_label, defined_return_label
                 )
             }
