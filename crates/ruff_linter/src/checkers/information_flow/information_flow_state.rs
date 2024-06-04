@@ -37,24 +37,14 @@ impl Default for PC {
     }
 }
 
-#[derive(Clone, Debug)]
-struct FunctionDefinition<'a> {
+#[derive(Clone, Debug, Default)]
+struct FunctionDefinition {
     /// The return label of the function
     return_label: Option<Label>,
     /// The parameter labels of the function
-    parameter_labels: &'a FxHashMap<String, Label>,
+    parameter_labels: FxHashMap<String, Label>,
     /// Function body for label inference
     body: Vec<Stmt>,
-}
-
-impl<'a> FunctionDefinition<'a> {
-    fn new(parameter_labels: &'a FxHashMap<String, Label>) -> Self {
-        Self {
-            return_label: None,
-            parameter_labels,
-            body: Vec::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -83,7 +73,7 @@ impl VariableMap {
 
 /// State of the information flow
 #[derive()]
-pub(crate) struct InformationFlowState<'a> {
+pub(crate) struct InformationFlowState {
     /// The current principles of the program, e.g. ['alice', 'bob']
     #[allow(dead_code)]
     principals: Principals,
@@ -92,10 +82,10 @@ pub(crate) struct InformationFlowState<'a> {
     /// Map from variable name to
     variable_map_scopes: VecDeque<VariableMap>,
     /// Map from function name to parameter label
-    function_map: FxHashMap<BindingId, FunctionDefinition<'a>>,
+    function_map: FxHashMap<BindingId, FunctionDefinition>,
 }
 
-impl<'a> InformationFlowState<'a> {
+impl InformationFlowState {
     pub(crate) fn push_variable_scope(&mut self) {
         self.variable_map_scopes.push_front(VariableMap::default());
     }
@@ -185,19 +175,26 @@ impl<'a> InformationFlowState<'a> {
     }
 
     pub(crate) fn get_fn_parameter_name(
-        &'a self,
+        &self,
         fn_binding_id: BindingId,
         index: usize,
-    ) -> Option<&'a String> {
+    ) -> Option<String> {
         if let Some(FunctionDefinition {
             parameter_labels, ..
         }) = self.function_map.get(&fn_binding_id)
         {
             if let Some(name) = parameter_labels.keys().nth(index) {
-                return Some(name);
+                return Some(name.clone());
             }
         }
 
+        None
+    }
+
+    pub(crate) fn get_fn_body(&self, fn_binding_id: BindingId) -> Option<&Vec<Stmt>> {
+        if let Some(FunctionDefinition { body, .. }) = self.function_map.get(&fn_binding_id) {
+            return Some(body);
+        }
         None
     }
 
@@ -329,7 +326,7 @@ impl<'a> InformationFlowState<'a> {
         let function_map = self
             .function_map
             .entry(function_binding_id)
-            .or_insert_with(FunctionDefinition::new(&FxHashMap::default()));
+            .or_insert_with(FunctionDefinition::default);
 
         function_map.body = body;
 

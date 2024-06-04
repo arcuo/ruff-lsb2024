@@ -359,7 +359,7 @@ impl<'a> Checker<'a> {
     }
 
     /// The [`InformationFlowState`], built up over the course of the AST traversal
-    pub(crate) const fn information_flow(&self) -> &InformationFlowState<'a> {
+    pub(crate) const fn information_flow(&self) -> &InformationFlowState {
         &self.information_flow
     }
 
@@ -941,9 +941,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }
             Stmt::For(ast::StmtFor { iter, .. }) => {
                 // For information flow, handle block PC (Implicit)
-                if let Some(label) =
-                    get_label_for_expression(&self.semantic, &self.information_flow, iter)
-                {
+                if let Some(label) = self.get_label_for_expression(iter) {
                     self.information_flow.push_pc(label.clone(), iter.range());
                 }
 
@@ -986,9 +984,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 visitor::walk_stmt(self, stmt);
 
                 if let Some(expr) = value {
-                    if let Some(label) =
-                        get_label_for_expression(self.semantic(), self.information_flow(), expr)
-                    {
+                    if let Some(label) = self.get_label_for_expression(expr) {
                         self.information_flow
                             .variable_map()
                             .update_return_label(label)
@@ -1841,8 +1837,7 @@ impl<'a> Checker<'a> {
         self.semantic.flags = snapshot;
 
         // Get label of the statement and add to information_flow.pc
-        if let Some(label) = get_label_for_expression(&self.semantic, &self.information_flow, expr)
-        {
+        if let Some(label) = self.get_label_for_expression(expr) {
             self.information_flow.push_pc(label, expr.range());
         }
     }
@@ -2421,22 +2416,37 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
+    fn get_label_for_expression(&'a mut self, expr: &'a Expr) -> Option<Label> {
+        match expr {
+            Expr::Call(call_expr) => {
+                // Get function name
+                let Some(fn_name) = call_expr.func.as_name() else {
+                    return None;
+                };
+
+                // Check if there exists a defined return label
+                let Some(fn_binding_id) = self.semantic.current_scope().get(fn_name) else {
+                    return None;
+                };
+
+                let Some(body) = self.information_flow.get_fn_body(fn_binding_id) else {
+                    return None;
+                };
+
+                self.get_call_expr_inferred_label(call_expr, fn_binding_id, body)
+            }
+            _ => get_label_for_expression(self.semantic(), self.information_flow(), expr),
+        }
+    }
+
     /// Traverse the body of a function and get return label inferred from arguments added to the body.
     fn get_call_expr_inferred_label(
         &mut self,
-        call_expr: ExprCall,
+        call_expr: &'a ExprCall,
+        fn_binding_id: BindingId,
         body: &'a Vec<Stmt>,
     ) -> Option<Label> {
-        // Get function name
-        let Some(fn_name) = call_expr.func.as_name() else {
-            return None;
-        };
-
-        // Check if there exists a defined return label
-        let Some(fn_binding_id) = self.semantic.current_scope().get(fn_name) else {
-            return None;
-        };
-
+        
         if let Some(return_label) = self.information_flow.get_label(fn_binding_id) {
             return Some(return_label);
         }
@@ -2445,22 +2455,15 @@ impl<'a> Checker<'a> {
         self.information_flow.push_variable_scope();
         let snapshot = self.semantic.snapshot();
 
-        // Add argument labels to the scope.
-        for (i, arg) in call_expr.arguments.args.into_iter().enumerate() {
-            let Some(argname) = self
-                .information_flow()
-                .get_fn_parameter_name(fn_binding_id, i)
-            else {
-                continue;
-            };
-
+        call_expr.arguments.keywords.iter().for_each(|kw| {
+            let arg_str = kw.arg.as_ref().unwrap().as_str();
             self.add_binding(
-                argname,
-                arg.range(),
+                arg_str,
+                kw.range(),
                 BindingKind::Argument,
                 BindingFlags::empty(),
             );
-        }
+        });
 
         // Traverse body
         for stmt in body {
