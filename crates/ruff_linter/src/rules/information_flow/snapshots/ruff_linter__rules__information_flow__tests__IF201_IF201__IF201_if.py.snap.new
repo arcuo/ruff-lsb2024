@@ -16,7 +16,7 @@ IF201_if.py:10:5: IF201 Invalid confidentiality implicit flow: public_var@{} < p
  8 | if secret_var > 0: # PC = {secret}
  9 |     public_var = 0 # Fail
 10 |     public_var += 1 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^ IF201
 11 |     public_var: int = 2 # Fail
    |
 
@@ -25,7 +25,7 @@ IF201_if.py:11:5: IF201 Invalid confidentiality implicit flow: public_var@{} < p
  9 |     public_var = 0 # Fail
 10 |     public_var += 1 # Fail
 11 |     public_var: int = 2 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^^^^^ IF201
 12 | 
 13 |     secret_var = 0 # Success
    |
@@ -44,7 +44,7 @@ IF201_if.py:19:9: IF201 Invalid confidentiality implicit flow: public_var@{} < p
 17 |     if public_var > 0: # Nested if does not decrease the pc {secret}
 18 |         public_var = 0 # Fail
 19 |         public_var += 1 # Fail
-   |         ^^^^^^^^^^ IF201
+   |         ^^^^^^^^^^^^^^^ IF201
 20 |         public_var: int = 2 # Fail
    |
 
@@ -53,7 +53,7 @@ IF201_if.py:20:9: IF201 Invalid confidentiality implicit flow: public_var@{} < p
 18 |         public_var = 0 # Fail
 19 |         public_var += 1 # Fail
 20 |         public_var: int = 2 # Fail
-   |         ^^^^^^^^^^ IF201
+   |         ^^^^^^^^^^^^^^^^^^^ IF201
 21 | 
 22 | elif public_var > 0: # Still in the same block i.e. the initial block sets the pc {secret}
    |
@@ -72,7 +72,7 @@ IF201_if.py:24:5: IF201 Invalid confidentiality implicit flow: public_var@{} < p
 22 | elif public_var > 0: # Still in the same block i.e. the initial block sets the pc {secret}
 23 |     public_var = 0 # Fail
 24 |     public_var += 1 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^ IF201
 25 |     public_var: int = 2 # Fail
    |
 
@@ -81,7 +81,7 @@ IF201_if.py:25:5: IF201 Invalid confidentiality implicit flow: public_var@{} < p
 23 |     public_var = 0 # Fail
 24 |     public_var += 1 # Fail
 25 |     public_var: int = 2 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^^^^^ IF201
 26 | 
 27 | else: # Still in the same block i.e. the initial test sets the pc {secret}
    |
@@ -100,7 +100,7 @@ IF201_if.py:29:5: IF201 Invalid confidentiality implicit flow: public_var@{} < p
 27 | else: # Still in the same block i.e. the initial test sets the pc {secret}
 28 |     public_var = 0 # Fail
 29 |     public_var += 1 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^ IF201
 30 |     public_var: int = 2 # Fail
    |
 
@@ -109,7 +109,7 @@ IF201_if.py:30:5: IF201 Invalid confidentiality implicit flow: public_var@{} < p
 28 |     public_var = 0 # Fail
 29 |     public_var += 1 # Fail
 30 |     public_var: int = 2 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^^^^^ IF201
 31 | 
 32 | # PC should be reset after block
    |
@@ -128,7 +128,7 @@ IF201_if.py:51:9: IF201 Invalid confidentiality implicit flow: public_var@{} < p
 49 |     if secret_var == 0: # Nested if increases the pc {secret}
 50 |         public_var = 0 # Fail
 51 |         public_var += 1 # Fail
-   |         ^^^^^^^^^^ IF201
+   |         ^^^^^^^^^^^^^^^ IF201
 52 |         public_var: int = 2 # Fail
    |
 
@@ -137,7 +137,7 @@ IF201_if.py:52:9: IF201 Invalid confidentiality implicit flow: public_var@{} < p
 50 |         public_var = 0 # Fail
 51 |         public_var += 1 # Fail
 52 |         public_var: int = 2 # Fail
-   |         ^^^^^^^^^^ IF201
+   |         ^^^^^^^^^^^^^^^^^^^ IF201
 53 | 
 54 |         secret_var = 0 # Success
    |

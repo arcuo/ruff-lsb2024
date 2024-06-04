@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/information_flow/mod.rs
+assertion_line: 58
+---
+IF101_aug.py:18:1: IF101 Invalid confidentiality explicit flow: bob_var@{bob} < alice_bob_var@{alice, bob}
+   |
+17 | # IF101: Fail Information flow from b to a
+18 | bob_var += alice_bob_var
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ IF101
+19 | 
+20 | # IF101: Fail Information flow from b to a
+   |
+
+IF101_aug.py:21:1: IF101 Invalid confidentiality explicit flow: public_var@{} < bob_var@{bob}
+   |
+20 | # IF101: Fail Information flow from b to a
+21 | public_var += bob_var
+   | ^^^^^^^^^^^^^^^^^^^^^ IF101
+   |

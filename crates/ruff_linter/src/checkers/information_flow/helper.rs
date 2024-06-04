@@ -3,7 +3,7 @@ use super::label::Label;
 use itertools::Itertools;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprDict, ExprIf,
-    ExprList, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp, StmtReturn,
+    ExprList, ExprSet, ExprSlice, ExprSubscript, ExprTuple, ExprUnaryOp,
 };
 use ruff_python_ast::{ExprName, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -206,7 +206,7 @@ pub(crate) fn get_label_for_expression(
 
         // Functions
         Expr::Call(ExprCall {
-            func, arguments, ..
+            func, ..
         }) => get_label_for_expression(semantic, information_flow, func),
         Expr::Lambda(_) => None, // TODO: Handle lambda expressions
         Expr::Await(ExprAwait { value, .. }) => {

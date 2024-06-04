@@ -45,7 +45,7 @@ integrity_vs_confidentiality.py:35:5: IF101 Invalid integrity explicit flow: ali
    |     ^^^^^^^^^^^^^^^^^^ IF101
    |
 
-integrity_vs_confidentiality.py:40:1: IF101 Invalid confidentiality and integrity explicit flow: The target alice_var@{alice} is in another branch than the value bob_var@{bob}
+integrity_vs_confidentiality.py:40:1: IF101 Invalid confidentiality and integrity explicit flow: alice_var@{alice} != bob_var@{bob}
    |
 38 | ## Both
 39 | 

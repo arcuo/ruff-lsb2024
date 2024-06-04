@@ -16,7 +16,7 @@ IF201_nested.py:13:9: IF201 Invalid confidentiality implicit flow: public_var@{}
 11 |     public_var = 0 # Fail
 12 |     while public_var < 10: # PC = {secret}
 13 |         public_var += 1 # Fail
-   |         ^^^^^^^^^^ IF201
+   |         ^^^^^^^^^^^^^^^ IF201
 14 | 
 15 | if public_var > 0: # PC = {}
    |
@@ -35,7 +35,7 @@ IF201_nested.py:18:9: IF201 Invalid confidentiality implicit flow: public_var@{}
 16 |     public_var = 0 # Success
 17 |     while secret_var < 10: # PC = {secret}
 18 |         public_var += 1 # Fail
-   |         ^^^^^^^^^^ IF201
+   |         ^^^^^^^^^^^^^^^ IF201
 19 | 
 20 | ## Nested IF in WHILE
    |
@@ -54,7 +54,7 @@ IF201_nested.py:26:9: IF201 Invalid confidentiality implicit flow: public_var@{}
 24 |     secret_var += 1 # Success
 25 |     if public_var < 10: # PC = {secret}
 26 |         public_var += 1 # Fail
-   |         ^^^^^^^^^^ IF201
+   |         ^^^^^^^^^^^^^^^ IF201
 27 | 
 28 | while public_var < 10:
    |
@@ -63,7 +63,7 @@ IF201_nested.py:29:5: IF201 Invalid confidentiality implicit flow: public_var@{}
    |
 28 | while public_var < 10:
 29 |     public_var += 1 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^ IF201
 30 |     if secret_var < 10: # PC = {secret}
 31 |         secret_var += 1 # Success
    |
@@ -82,7 +82,7 @@ IF201_nested.py:40:5: IF201 Invalid confidentiality implicit flow: public_var@{}
    |
 39 | if public_var == 0:
 40 |     public_var += 1 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^ IF201
 41 | 
 42 | while public_var < 10:
    |
@@ -91,5 +91,5 @@ IF201_nested.py:43:5: IF201 Invalid confidentiality implicit flow: public_var@{}
    |
 42 | while public_var < 10:
 43 |     public_var += 1 # Fail
-   |     ^^^^^^^^^^ IF201
+   |     ^^^^^^^^^^^^^^^ IF201
    |

@@ -101,12 +101,6 @@ pub(crate) fn check_explicit_arg_value(
         return;
     }
 
-    let shown_property = if security_property.is_both() {
-        property
-    } else {
-        security_property.clone()
-    };
-
     let expr_string = checker.locator().slice(arg.range()).to_string();
 
     let diagnostic = Diagnostic::new(
@@ -115,7 +109,7 @@ pub(crate) fn check_explicit_arg_value(
             arg_label,
             argname: argname.to_string(),
             defined_arg_label,
-            property: shown_property,
+            property,
         },
         arg.range(),
     );

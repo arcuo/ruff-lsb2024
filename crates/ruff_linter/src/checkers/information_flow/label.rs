@@ -11,7 +11,7 @@ lazy_static! {
     static ref LABEL_REGEX: Regex =
         Regex::new(r"iflabel\s*\{\s*(?P<label>[\w\s,]+)?\s*\}").unwrap();
     static ref FUNCTION_LABEL_REGEX: Regex =
-        Regex::new(r"iflabel\s+fn\s*\(\s*(?P<arg>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z]]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})?\s*\)\s*(\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)?\s*\})?").unwrap();
+        Regex::new(r"iflabel\s+fn\s*\(\s*(?P<args>(?:[a-zA-Z]+\s*:\s*\{[[a-zA-Z], ]*\}\s*,\s*)*[a-zA-Z]+\s*:\s*\{[[a-zA-Z](,\s)*\}]*\})?\s*\)\s*(\{\s*(?P<returnlabel>([a-zA-Z](,\s*)?)+)?\s*\})?").unwrap();
     static ref ARG_LABEL_REGEX: Regex = Regex::new(r"\s*(?P<argname>[\w]+)\s*:\s*\{(?P<label>[\w\s*,]+)?\}").unwrap();
 }
 
@@ -245,34 +245,32 @@ impl FromStr for FunctionLabel {
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         match FUNCTION_LABEL_REGEX.captures(string) {
             Some(captures) => {
-                let argument_labels = match captures.name("arg") {
-                    Some(arg) => {
+                let argument_labels = match captures.name("args") {
+                    Some(args) => {
                         let mut labels = vec![];
-                        for arg_label in arg.as_str().split(',') {
-                            let captures = ARG_LABEL_REGEX.captures(arg_label);
-                            match captures {
-                                Some(captures) => {
-                                    if let Some(argname) = captures.name("argname") {
-                                        if let Some(labels_string) = captures.name("label") {
-                                            let label = Label::new(
-                                                labels_string
-                                                    .as_str()
-                                                    .split(',')
-                                                    .map(str::to_string)
-                                                    .collect(),
-                                            );
-                                            labels.push((argname.as_str().to_string(), label));
-                                        } else {
-                                            labels.push((
-                                                argname.as_str().to_string(),
-                                                Label::new_public(),
-                                            ));
-                                        }
+                        ARG_LABEL_REGEX
+                            .captures_iter(args.into())
+                            .for_each(|capture| {
+                                if let Some(argname) = capture.name("argname") {
+                                    if let Some(labels_string) = capture.name("label") {
+                                        let label = Label::new(
+                                            labels_string
+                                                .as_str()
+                                                .split(',')
+                                                .map(str::trim)
+                                                .map(str::to_string)
+                                                .collect(),
+                                        );
+                                        labels.push((argname.as_str().to_string(), label));
+                                    } else {
+                                        labels.push((
+                                            argname.as_str().to_string(),
+                                            Label::new_public(),
+                                        ));
                                     }
                                 }
-                                None => return Err(LabelParseError),
-                            }
-                        }
+                            });
+
                         labels
                     }
                     None => vec![],
