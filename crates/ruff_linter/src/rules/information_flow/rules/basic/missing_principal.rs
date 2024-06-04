@@ -8,7 +8,8 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::checkers::{
     ast::Checker,
     information_flow::{
-        information_flow_state::get_comment_label, label::Label,
+        information_flow_state::{get_comment_function_label, get_comment_variable_label},
+        label::{FunctionLabel, Label},
         principals::Principals,
     },
 };
@@ -64,9 +65,49 @@ impl Violation for IFMissingPrincipal {
     }
 }
 
-/// IF002
-pub(crate) fn missing_principal_from_label(checker: &mut Checker, assign_range: TextRange) {
-    let Some((label, comment_range)) = get_comment_label(
+///IF002 Functions
+pub(crate) fn missing_principal_from_function_label(
+    checker: &mut Checker,
+    function_range: TextRange,
+) {
+    let Some((fn_label, comment_range)) = get_comment_function_label(
+        function_range,
+        checker.locator(),
+        checker.indexer().comment_ranges(),
+    ) else {
+        return; // No label found, so no principal to check
+    };
+
+    let global_principals = checker.information_flow().principals().clone();
+    let return_label_principals = &fn_label.return_label.principals;
+
+    for principal in return_label_principals {
+        check_label_missing(
+            checker,
+            &global_principals,
+            fn_label.to_string(),
+            principal,
+            comment_range,
+        );
+    }
+
+    for (_, arg) in &fn_label.argument_labels {
+        let arg_label_principals = &arg.principals;
+        for principal in arg_label_principals {
+            check_label_missing(
+                checker,
+                &global_principals,
+                fn_label.to_string(),
+                principal,
+                comment_range,
+            );
+        }
+    }
+}
+
+/// IF002 Assign
+pub(crate) fn missing_principal_from_assign_label(checker: &mut Checker, assign_range: TextRange) {
+    let Some((label, comment_range)) = get_comment_variable_label(
         assign_range,
         checker.locator(),
         checker.indexer().comment_ranges(),
@@ -78,38 +119,54 @@ pub(crate) fn missing_principal_from_label(checker: &mut Checker, assign_range: 
     let label_principals = &label.principals;
 
     for principal in label_principals {
-        if !global_principals.principals.contains(&principal) {
-            {
-                let global_principals: &Principals = &global_principals;
-                // Find the range of the label
-                let comment_text = &checker.locator().slice(comment_range);
-                let principal_range =
-                    match TryInto::<TextSize>::try_into(comment_text.find(principal).unwrap()) {
-                        Ok(label_start_index) => {
-                            let principal_range = TextRange::new(
-                                comment_range.start() + label_start_index,
-                                comment_range.start() + label_start_index + TextSize::of(principal),
-                            );
-                            principal_range
-                        }
-                        Err(_) => {
-                            comment_range // If the principal is not found, then the range is the whole comment
-                        }
-                    };
+        check_label_missing(
+            checker,
+            &global_principals,
+            label.to_string(),
+            principal,
+            comment_range,
+        );
+    }
+}
 
-                let diagnostic = Diagnostic::new(
-                    IFMissingPrincipal {
-                        label_stmt: label.to_string(),
-                        missing_principal: principal.clone(),
-                        global_principals: global_principals.clone(),
-                    },
-                    principal_range,
-                )
-                .with_fix(add_principle(checker, principal));
+fn check_label_missing(
+    checker: &mut Checker,
+    global_principals: &Principals,
+    label_string: String,
+    principal: &String,
+    comment_range: TextRange,
+) {
+    if !global_principals.principals.contains(&principal) {
+        {
+            let global_principals: &Principals = &global_principals;
+            // Find the range of the label
+            let comment_text = &checker.locator().slice(comment_range);
+            let principal_range =
+                match TryInto::<TextSize>::try_into(comment_text.find(principal).unwrap()) {
+                    Ok(label_start_index) => {
+                        let principal_range = TextRange::new(
+                            comment_range.start() + label_start_index,
+                            comment_range.start() + label_start_index + TextSize::of(principal),
+                        );
+                        principal_range
+                    }
+                    Err(_) => {
+                        comment_range // If the principal is not found, then the range is the whole comment
+                    }
+                };
 
-                checker.diagnostics.push(diagnostic);
-            };
-        }
+            let diagnostic = Diagnostic::new(
+                IFMissingPrincipal {
+                    label_stmt: label_string,
+                    missing_principal: principal.clone(),
+                    global_principals: global_principals.clone(),
+                },
+                principal_range,
+            )
+            .with_fix(add_principle(checker, principal));
+
+            checker.diagnostics.push(diagnostic);
+        };
     }
 }
 

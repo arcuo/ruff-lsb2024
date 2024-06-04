@@ -6,7 +6,7 @@ use ruff_text_size::TextRange;
 
 use crate::checkers::{
         ast::Checker,
-        information_flow::{information_flow_state::get_comment_label, label::Label},
+        information_flow::{information_flow_state::get_comment_variable_label, label::Label},
     };
 
 /// ## What it does
@@ -74,7 +74,7 @@ pub(crate) fn must_include_target_variable_label(
                 .is_none()
             {
                 // Check if the variable has a label
-                if get_comment_label(
+                if get_comment_variable_label(
                     target.range(),
                     checker.locator(),
                     checker.indexer().comment_ranges(),

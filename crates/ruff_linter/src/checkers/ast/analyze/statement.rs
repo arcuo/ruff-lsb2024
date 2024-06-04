@@ -86,6 +86,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::IFMissingPrincipal) {
+                information_flow::rules::missing_principal_from_function_label(
+                    checker,
+                    stmt.range(),
+                );
+            }
+
             if checker.enabled(Rule::DjangoNonLeadingReceiverDecorator) {
                 flake8_django::rules::non_leading_receiver_decorator(checker, decorator_list);
             }
@@ -1490,7 +1497,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
 
             if checker.enabled(Rule::IFMissingPrincipal) {
-                information_flow::rules::missing_principal_from_label(checker, assign.range());
+                information_flow::rules::missing_principal_from_assign_label(
+                    checker,
+                    assign.range(),
+                );
             }
 
             if checker.enabled(Rule::SelfOrClsAssignment) {
@@ -1659,7 +1669,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
                 if checker.enabled(Rule::IFMissingPrincipal) {
-                    information_flow::rules::missing_principal_from_label(
+                    information_flow::rules::missing_principal_from_assign_label(
                         checker,
                         assign_stmt.range(),
                     );

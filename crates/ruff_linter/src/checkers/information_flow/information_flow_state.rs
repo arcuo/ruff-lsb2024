@@ -331,24 +331,21 @@ impl InformationFlowState {
         function_map.body = body;
 
         // Read labels from comment
-        if let Some((label, _)) = get_comment_text(range, locator, comment_ranges) {
-            if let Ok(fn_label) = label.as_str().parse::<FunctionLabel>() {
-                // Insert return label into variable map based on binding_id
-                self.variable_map_scopes
-                    .front_mut()
-                    .unwrap()
-                    .insert(function_binding_id, fn_label.return_label.clone());
+        if let Some((fn_label, _)) = get_comment_function_label(range, locator, comment_ranges) {
+            // Insert return label into variable map based on binding_id
+            self.variable_map_scopes
+                .front_mut()
+                .unwrap()
+                .insert(function_binding_id, fn_label.return_label.clone());
 
-                function_map.return_label = Some(fn_label.return_label);
+            function_map.return_label = Some(fn_label.return_label);
 
-                for (name, label) in fn_label.argument_labels.iter() {
-                    function_map
-                        .parameter_labels
-                        .insert(name.clone(), label.clone());
-                }
-                return;
+            for (name, label) in fn_label.argument_labels.iter() {
+                function_map
+                    .parameter_labels
+                    .insert(name.clone(), label.clone());
             }
-        } else {
+            return;
         }
     }
 
@@ -380,13 +377,26 @@ impl InformationFlowState {
     }
 }
 
-pub(crate) fn get_comment_label(
+pub(crate) fn get_comment_variable_label(
     range: TextRange,
     locator: &Locator,
     comment_ranges: &CommentRanges,
 ) -> Option<(Label, TextRange)> {
     if let Some((label, comment_range)) = get_comment_text(range, locator, comment_ranges) {
         if let Ok(label) = label.as_str().parse::<Label>() {
+            return Some((label, comment_range));
+        }
+    }
+    None
+}
+
+pub(crate) fn get_comment_function_label(
+    range: TextRange,
+    locator: &Locator,
+    comment_ranges: &CommentRanges,
+) -> Option<(FunctionLabel, TextRange)> {
+    if let Some((label, comment_range)) = get_comment_text(range, locator, comment_ranges) {
+        if let Ok(label) = label.as_str().parse::<FunctionLabel>() {
             return Some((label, comment_range));
         }
     }

@@ -92,7 +92,7 @@ mod tests {
                     security_property: information_flow::SecurityProperty::Confidentiality,
                 },
                 target_version: PythonVersion::Py310,
-                ..settings::LinterSettings::for_rule(Rule::IFExplicitFunctionReturn)
+                ..settings::LinterSettings::for_rule(Rule::IFMissingPrincipal)
             },
         );
         print!("{:?}", diagnostics)
