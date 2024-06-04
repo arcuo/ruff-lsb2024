@@ -81,20 +81,4 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
-
-    #[test]
-    fn test() {
-        let path = Path::new("/home/benjamin/Datalogi/language_security/project/example/server.py");
-        let diagnostics = test_path(
-            path,
-            &settings::LinterSettings {
-                information_flow: information_flow::settings::Settings {
-                    security_property: information_flow::SecurityProperty::Confidentiality,
-                },
-                target_version: PythonVersion::Py310,
-                ..settings::LinterSettings::for_rule(Rule::IFMissingPrincipal)
-            },
-        );
-        print!("{:?}", diagnostics)
-    }
 }
